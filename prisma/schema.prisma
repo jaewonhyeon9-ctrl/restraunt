@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 사업장
+model Restaurant {
+  id         String   @id @default(cuid())
+  name       String
+  address    String?
+  lat        Float?
+  lng        Float?
+  gpsRadius  Int      @default(50)
+  createdAt  DateTime @default(now())
+
+  users            User[]
+  checklistTemplates ChecklistTemplate[]
+  suppliers        Supplier[]
+  inventoryItems   InventoryItem[]
+  purchaseOrders   PurchaseOrder[]
+  receiptImages    ReceiptImage[]
+  expenses         Expense[]
+  fixedExpenses    FixedExpense[]
+  sales            Sale[]
+  dailyReports     DailyReport[]
+  notifications    Notification[]
+  attendance       Attendance[]
+  checklistLogs    ChecklistLog[]
+  inventoryLogs    InventoryLog[]
+}
+
+// 사용자 (사장 + 직원)
+model User {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  email         String     @unique
+  passwordHash  String
+  name          String
+  role          Role       @default(EMPLOYEE)
+  phone         String?
+  hourlyWage    Float?
+  monthlyWage   Float?
+  hireDate      DateTime?
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+
+  restaurant       Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  attendance       Attendance[]
+  checklistLogs    ChecklistLog[]
+  requestedOrders  PurchaseOrder[] @relation("RequestedBy")
+  approvedOrders   PurchaseOrder[] @relation("ApprovedBy")
+  receiptImages    ReceiptImage[]
+  expenses         Expense[]
+  sales            Sale[]
+  inventoryLogs    InventoryLog[]
+  notifications    Notification[]
+}
+
+enum Role {
+  OWNER
+  EMPLOYEE
+}
+
+// 출퇴근 기록
+model Attendance {
+  id           String    @id @default(cuid())
+  userId       String
+  restaurantId String
+  date         DateTime  @db.Date
+  clockIn      DateTime?
+  clockOut     DateTime?
+  clockInLat   Float?
+  clockInLng   Float?
+  clockOutLat  Float?
+  clockOutLng  Float?
+  workMinutes  Int?
+  dailyWage    Float?
+  note         String?
+  createdAt    DateTime  @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([userId, date])
+}
+
+// 체크리스트 템플릿
+model ChecklistTemplate {
+  id           String   @id @default(cuid())
+  restaurantId String
+  title        String
+  description  String?
+  assignedRole Role     @default(EMPLOYEE)
+  timeSlot     String?
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  restaurant    Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  checklistLogs ChecklistLog[]
+}
+
+// 체크리스트 실행 로그
+model ChecklistLog {
+  id           String    @id @default(cuid())
+  templateId   String
+  userId       String
+  restaurantId String
+  date         DateTime  @db.Date
+  checkedAt    DateTime?
+  isChecked    Boolean   @default(false)
+  note         String?
+  createdAt    DateTime  @default(now())
+
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id])
+  user       User              @relation(fields: [userId], references: [id])
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id])
+
+  @@unique([templateId, userId, date])
+}
+
+// 거래처
+model Supplier {
+  id           String   @id @default(cuid())
+  restaurantId String
+  name         String
+  contactName  String?
+  phone        String?
+  email        String?
+  category     String?
+  paymentDay   Int?
+  note         String?
+  createdAt    DateTime @default(now())
+
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  inventoryItems InventoryItem[]
+  purchaseOrders PurchaseOrder[]
+  expenses       Expense[]
+}
+
+// 재고 마스터
+model InventoryItem {
+  id           String   @id @default(cuid())
+  restaurantId String
+  supplierId   String?
+  name         String
+  unit         String
+  unitPrice    Float?
+  safetyStock  Float?
+  currentStock Float    @default(0)
+  category     String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  restaurant     Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier       Supplier?           @relation(fields: [supplierId], references: [id])
+  inventoryLogs  InventoryLog[]
+  orderItems     PurchaseOrderItem[]
+}
+
+// 재고 변동 이력
+model InventoryLog {
+  id           String           @id @default(cuid())
+  itemId       String
+  restaurantId String
+  userId       String
+  type         InventoryLogType
+  quantity     Float
+  beforeStock  Float?
+  afterStock   Float?
+  unitPrice    Float?
+  totalPrice   Float?
+  note         String?
+  expenseId    String?
+  createdAt    DateTime         @default(now())
+
+  item       InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  restaurant Restaurant    @relation(fields: [restaurantId], references: [id])
+  user       User          @relation(fields: [userId], references: [id])
+}
+
+enum InventoryLogType {
+  IN
+  OUT
+  ADJUST
+  ORDER_IN
+}
+
+// 발주
+model PurchaseOrder {
+  id            String              @id @default(cuid())
+  restaurantId  String
+  supplierId    String?
+  requestedById String
+  approvedById  String?
+  orderDate     DateTime            @db.Date
+  expectedDate  DateTime?           @db.Date
+  status        PurchaseOrderStatus @default(PENDING)
+  totalAmount   Float?
+  note          String?
+  createdAt     DateTime            @default(now())
+
+  restaurant   Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier     Supplier?           @relation(fields: [supplierId], references: [id])
+  requestedBy  User                @relation("RequestedBy", fields: [requestedById], references: [id])
+  approvedBy   User?               @relation("ApprovedBy", fields: [approvedById], references: [id])
+  items        PurchaseOrderItem[]
+}
+
+enum PurchaseOrderStatus {
+  PENDING
+  APPROVED
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+// 발주 상세
+model PurchaseOrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  itemId     String?
+  itemName   String
+  quantity   Float
+  unit       String
+  unitPrice  Float?
+  totalPrice Float?
+
+  order PurchaseOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item  InventoryItem? @relation(fields: [itemId], references: [id])
+}
+
+// 영수증 이미지
+model ReceiptImage {
+  id           String        @id @default(cuid())
+  restaurantId String
+  userId       String
+  imageUrl     String
+  ocrRawText   String?
+  ocrParsed    Json?
+  status       ReceiptStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+  expenses   Expense[]
+}
+
+enum ReceiptStatus {
+  PENDING
+  PROCESSED
+  CONFIRMED
+  FAILED
+}
+
+// 지출
+model Expense {
+  id             String          @id @default(cuid())
+  restaurantId   String
+  userId         String
+  supplierId     String?
+  receiptId      String?
+  category       ExpenseCategory
+  amount         Float
+  expenseDate    DateTime        @db.Date
+  description    String?
+  isFixed        Boolean         @default(false)
+  fixedExpenseId String?
+  createdAt      DateTime        @default(now())
+
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id])
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id])
+  receiptImage ReceiptImage? @relation(fields: [receiptId], references: [id])
+  fixedExpense FixedExpense? @relation(fields: [fixedExpenseId], references: [id])
+}
+
+enum ExpenseCategory {
+  INGREDIENT
+  UTILITY
+  WAGE
+  RENT
+  EQUIPMENT
+  OTHER
+}
+
+// 고정지출 마스터
+model FixedExpense {
+  id           String          @id @default(cuid())
+  restaurantId String
+  name         String
+  category     ExpenseCategory
+  amount       Float
+  billingDay   Int?
+  isDailyCalc  Boolean         @default(false)
+  userId       String?
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  expenses   Expense[]
+}
+
+// 매출
+model Sale {
+  id             String   @id @default(cuid())
+  restaurantId   String
+  userId         String
+  saleDate       DateTime @db.Date
+  amount         Float
+  cashAmount     Float    @default(0)
+  cardAmount     Float    @default(0)
+  deliveryAmount Float    @default(0)
+  note           String?
+  createdAt      DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@unique([restaurantId, saleDate])
+}
+
+// 일일 손익 리포트
+model DailyReport {
+  id             String   @id @default(cuid())
+  restaurantId   String
+  reportDate     DateTime @db.Date
+  totalSales     Float    @default(0)
+  totalExpenses  Float    @default(0)
+  ingredientCost Float    @default(0)
+  wageCost       Float    @default(0)
+  fixedCost      Float    @default(0)
+  otherCost      Float    @default(0)
+  netProfit      Float    @default(0)
+  profitMargin   Float?
+  createdAt      DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, reportDate])
+}
+
+// 알림
+model Notification {
+  id            String   @id @default(cuid())
+  restaurantId  String
+  userId        String?
+  type          String
+  title         String
+  message       String?
+  referenceId   String?
+  referenceType String?
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  user       User?      @relation(fields: [userId], references: [id])
+}

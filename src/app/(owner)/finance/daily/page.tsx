@@ -1,0 +1,389 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+
+interface ExpenseItem {
+  id: string
+  category: 'INGREDIENT' | 'WAGE' | 'UTILITY' | 'RENT' | 'EQUIPMENT' | 'OTHER'
+  amount: number
+  description: string | null
+  supplier?: { name: string } | null
+  expenseDate: string
+}
+
+interface SaleData {
+  id: string
+  amount: number
+  cashAmount: number
+  cardAmount: number
+  deliveryAmount: number
+  note: string | null
+}
+
+interface DailySummary {
+  sales: number
+  expenses: number
+  netProfit: number
+  ingredientCost: number
+  wageCost: number
+  fixedCost: number
+  otherCost: number
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  INGREDIENT: '식재료',
+  WAGE: '인건비',
+  UTILITY: '공과금',
+  RENT: '임대료',
+  EQUIPMENT: '설비',
+  OTHER: '기타',
+}
+
+const CATEGORY_COLOR: Record<string, string> = {
+  INGREDIENT: 'bg-orange-100 text-orange-700',
+  WAGE: 'bg-blue-100 text-blue-700',
+  UTILITY: 'bg-yellow-100 text-yellow-700',
+  RENT: 'bg-purple-100 text-purple-700',
+  EQUIPMENT: 'bg-gray-100 text-gray-700',
+  OTHER: 'bg-green-100 text-green-700',
+}
+
+function formatDate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function formatCurrency(n: number): string {
+  return n.toLocaleString('ko-KR') + '원'
+}
+
+function formatDisplayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-')
+  const days = ['일', '월', '화', '수', '목', '금', '토']
+  const date = new Date(Number(y), Number(m) - 1, Number(d))
+  return `${y}년 ${m}월 ${d}일 (${days[date.getDay()]})`
+}
+
+export default function DailyFinancePage() {
+  const router = useRouter()
+  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()))
+  const [summary, setSummary] = useState<DailySummary>({
+    sales: 0, expenses: 0, netProfit: 0,
+    ingredientCost: 0, wageCost: 0, fixedCost: 0, otherCost: 0,
+  })
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([])
+  const [sale, setSale] = useState<SaleData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [showSaleModal, setShowSaleModal] = useState(false)
+  const [saleForm, setSaleForm] = useState({
+    amount: '',
+    cashAmount: '',
+    cardAmount: '',
+    deliveryAmount: '',
+    note: '',
+  })
+  const [savingNow, setSavingNow] = useState(false)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [expRes, saleRes] = await Promise.all([
+        fetch(`/api/expenses?date=${selectedDate}`),
+        fetch(`/api/sales?date=${selectedDate}`),
+      ])
+
+      const expData = expRes.ok ? await expRes.json() : { expenses: [] }
+      const saleData = saleRes.ok ? await saleRes.json() : { sales: [] }
+
+      const expList: ExpenseItem[] = expData.expenses || []
+      const saleItem: SaleData | null = saleData.sales?.[0] || null
+
+      setExpenses(expList)
+      setSale(saleItem)
+
+      const totalExpenses = expList.reduce((s: number, e: ExpenseItem) => s + e.amount, 0)
+      const totalSales = saleItem?.amount ?? 0
+
+      setSummary({
+        sales: totalSales,
+        expenses: totalExpenses,
+        netProfit: totalSales - totalExpenses,
+        ingredientCost: expList.filter((e) => e.category === 'INGREDIENT').reduce((s, e) => s + e.amount, 0),
+        wageCost: expList.filter((e) => e.category === 'WAGE').reduce((s, e) => s + e.amount, 0),
+        fixedCost: expList.filter((e) => ['UTILITY', 'RENT', 'EQUIPMENT'].includes(e.category)).reduce((s, e) => s + e.amount, 0),
+        otherCost: expList.filter((e) => e.category === 'OTHER').reduce((s, e) => s + e.amount, 0),
+      })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedDate])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  const openSaleModal = () => {
+    if (sale) {
+      setSaleForm({
+        amount: String(sale.amount),
+        cashAmount: String(sale.cashAmount),
+        cardAmount: String(sale.cardAmount),
+        deliveryAmount: String(sale.deliveryAmount),
+        note: sale.note ?? '',
+      })
+    } else {
+      setSaleForm({ amount: '', cashAmount: '', cardAmount: '', deliveryAmount: '', note: '' })
+    }
+    setShowSaleModal(true)
+  }
+
+  const handleSaveSale = async () => {
+    const amount = Number(saleForm.amount.replace(/,/g, ''))
+    if (!amount) return
+    setSavingNow(true)
+    try {
+      await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          saleDate: selectedDate,
+          amount,
+          cashAmount: Number(saleForm.cashAmount.replace(/,/g, '')) || 0,
+          cardAmount: Number(saleForm.cardAmount.replace(/,/g, '')) || 0,
+          deliveryAmount: Number(saleForm.deliveryAmount.replace(/,/g, '')) || 0,
+          note: saleForm.note || null,
+        }),
+      })
+      setShowSaleModal(false)
+      await fetchData()
+    } finally {
+      setSavingNow(false)
+    }
+  }
+
+  const groupedExpenses: Record<string, ExpenseItem[]> = {
+    INGREDIENT: [],
+    WAGE: [],
+    UTILITY: [],
+    RENT: [],
+    EQUIPMENT: [],
+    OTHER: [],
+  }
+  expenses.forEach((e) => {
+    if (groupedExpenses[e.category]) groupedExpenses[e.category].push(e)
+    else groupedExpenses.OTHER.push(e)
+  })
+
+  const profitColor = summary.netProfit >= 0 ? 'text-blue-600' : 'text-red-500'
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* 헤더 */}
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
+        <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
+          <button onClick={() => router.back()} className="p-1.5 rounded-lg hover:bg-gray-100">
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-lg font-bold text-gray-900 flex-1">일별 손익</h1>
+          <button
+            onClick={openSaleModal}
+            className="bg-orange-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
+          >
+            매출 입력
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-md mx-auto px-4 py-4 space-y-4">
+        {/* 날짜 선택 */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <label className="block text-xs text-gray-500 mb-1.5 font-medium">날짜 선택</label>
+          <input
+            type="date"
+            value={selectedDate}
+            max={formatDate(new Date())}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+          />
+          <p className="text-xs text-gray-400 mt-1.5">{formatDisplayDate(selectedDate)}</p>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            {/* 요약 카드 3개 */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 text-center">
+                <p className="text-xs text-gray-500 mb-1">매출</p>
+                <p className="text-base font-bold text-gray-900 truncate">{formatCurrency(summary.sales)}</p>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 text-center">
+                <p className="text-xs text-gray-500 mb-1">지출</p>
+                <p className="text-base font-bold text-red-500 truncate">{formatCurrency(summary.expenses)}</p>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 text-center">
+                <p className="text-xs text-gray-500 mb-1">순이익</p>
+                <p className={`text-base font-bold truncate ${profitColor}`}>{formatCurrency(summary.netProfit)}</p>
+              </div>
+            </div>
+
+            {/* 매출 상세 (있을 때만) */}
+            {sale && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-gray-800">매출 상세</h2>
+                  <button onClick={openSaleModal} className="text-xs text-orange-500 font-medium">수정</button>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: '현금', value: sale.cashAmount },
+                    { label: '카드', value: sale.cardAmount },
+                    { label: '배달', value: sale.deliveryAmount },
+                  ].map((item) => (
+                    <div key={item.label} className="flex justify-between text-sm">
+                      <span className="text-gray-500">{item.label}</span>
+                      <span className="font-medium text-gray-800">{formatCurrency(item.value)}</span>
+                    </div>
+                  ))}
+                  {sale.note && (
+                    <p className="text-xs text-gray-400 pt-1 border-t border-gray-50">{sale.note}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 지출 카테고리별 요약 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <h2 className="text-sm font-semibold text-gray-800 mb-3">지출 카테고리별 요약</h2>
+              <div className="space-y-2">
+                {[
+                  { key: 'INGREDIENT', label: '식재료', value: summary.ingredientCost },
+                  { key: 'WAGE', label: '인건비', value: summary.wageCost },
+                  { key: 'FIXED', label: '고정비', value: summary.fixedCost },
+                  { key: 'OTHER', label: '기타', value: summary.otherCost },
+                ].map((item) => (
+                  <div key={item.key} className="flex items-center gap-2">
+                    <div className="flex-1 flex justify-between text-sm">
+                      <span className="text-gray-600">{item.label}</span>
+                      <span className="font-medium text-gray-800">{formatCurrency(item.value)}</span>
+                    </div>
+                    <div className="w-24 bg-gray-100 rounded-full h-1.5">
+                      <div
+                        className="bg-orange-400 h-1.5 rounded-full"
+                        style={{ width: summary.expenses ? `${Math.min(100, (item.value / summary.expenses) * 100)}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 지출 목록 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gray-800">지출 내역</h2>
+                <button
+                  onClick={() => router.push('/finance/expenses/receipt')}
+                  className="text-xs text-orange-500 font-medium"
+                >
+                  + 영수증 추가
+                </button>
+              </div>
+
+              {expenses.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">지출 내역이 없습니다</p>
+              ) : (
+                <div className="space-y-2">
+                  {expenses.map((expense) => (
+                    <div key={expense.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${CATEGORY_COLOR[expense.category] || CATEGORY_COLOR.OTHER}`}>
+                        {CATEGORY_LABEL[expense.category] || '기타'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 truncate">
+                          {expense.description || expense.supplier?.name || '내역 없음'}
+                        </p>
+                        {expense.supplier && expense.description && (
+                          <p className="text-xs text-gray-400">{expense.supplier.name}</p>
+                        )}
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900 shrink-0">
+                        {formatCurrency(expense.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 매출 입력 모달 */}
+      {showSaleModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
+          <div className="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-900">매출 {sale ? '수정' : '입력'}</h3>
+              <button onClick={() => setShowSaleModal(false)} className="p-1 text-gray-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500">{formatDisplayDate(selectedDate)}</p>
+
+            {[
+              { label: '총 매출액', key: 'amount', required: true },
+              { label: '현금', key: 'cashAmount', required: false },
+              { label: '카드', key: 'cardAmount', required: false },
+              { label: '배달', key: 'deliveryAmount', required: false },
+            ].map((field) => (
+              <div key={field.key}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {field.label} {field.required && <span className="text-orange-500">*</span>}
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={(saleForm as Record<string, string>)[field.key]}
+                  onChange={(e) => setSaleForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                  placeholder="0"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+            ))}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">메모</label>
+              <input
+                type="text"
+                value={saleForm.note}
+                onChange={(e) => setSaleForm((prev) => ({ ...prev, note: e.target.value }))}
+                placeholder="선택 입력"
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <button
+              onClick={handleSaveSale}
+              disabled={savingNow || !saleForm.amount}
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold py-3 rounded-xl text-sm"
+            >
+              {savingNow ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

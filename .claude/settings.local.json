@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\Hyun Jae Won\\\\Desktop\\\\restaurant-app\" /b)",
+      "Bash(cmd *)",
+      "Bash(powershell *)",
+      "Bash(npm run *)",
+      "Bash(ping -n 8 127.0.0.1)",
+      "Bash(node -e \"setTimeout\\(\\(\\) => {}, 8000\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const out=fs.readFileSync\\('C:/Users/HYUNJA~1/AppData/Local/Temp/claude/C--Users-Hyun-Jae-Won-Desktop-restaurant-app/f8d5cefa-6ebe-4fef-b85d-80ce61647c49/tasks/b9f103mh4.output','utf8'\\); console.log\\(out.slice\\(-3000\\)\\)\")",
+      "Bash(/c/Program Files/nodejs/npm.cmd run *)",
+      "Bash(/c/Program Files/nodejs/node.exe *)",
+      "Bash(\"/c/Program Files/nodejs/node.exe\" \"./node_modules/.bin/prisma\" generate)",
+      "Bash(\"/c/Program Files/nodejs/node.exe\" \"./node_modules/prisma/build/index.js\" generate)",
+      "Bash(taskkill /PID 12740 /F)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(cmd.exe *)",
+      "Bash(powershell.exe -Command \"Stop-Process -Id 12740 -Force\")",
+      "Bash(node *)"
+    ]
+  }
+}
