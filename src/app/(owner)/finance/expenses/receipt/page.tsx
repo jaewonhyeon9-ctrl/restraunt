@@ -289,7 +289,7 @@ export default function ReceiptOCRPage() {
         )}
 
         {/* 리뷰 단계 */}
-        {step === 'review' && parsedReceipt && (
+        {(step === 'review' || step === 'saving') && parsedReceipt && (
           <div className="space-y-4">
             {/* 미리보기 */}
             {imagePreview && (
