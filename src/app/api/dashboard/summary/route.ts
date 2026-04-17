@@ -32,6 +32,9 @@ export async function GET() {
   )
 
   // ── 병렬 쿼리 ──────────────────────────────────
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const dayOfMonth = now.getDate()
+
   const [
     todaySale,
     todayExpenses,
@@ -39,6 +42,7 @@ export async function GET() {
     monthlyExpenses,
     lowStockItems,
     todayAttendance,
+    fixedExpenses,
   ] = await Promise.all([
     // 오늘 매출 (Sale 테이블은 날짜별 unique 레코드)
     prisma.sale.findFirst({
@@ -108,13 +112,27 @@ export async function GET() {
       },
       orderBy: { clockIn: 'asc' },
     }),
+
+    // 고정비용 목록
+    prisma.fixedExpense.findMany({
+      where: { restaurantId, isActive: true },
+      select: { amount: true },
+    }),
   ])
 
   // ── 집계 ──────────────────────────────────────
   const todaySalesAmt = todaySale?.amount ?? 0
-  const todayExpensesAmt = todayExpenses._sum.amount ?? 0
+  const todayVariableExpenses = todayExpenses._sum.amount ?? 0
   const monthlySalesAmt = monthlySales._sum.amount ?? 0
-  const monthlyExpensesAmt = monthlyExpenses._sum.amount ?? 0
+  const monthlyVariableExpenses = monthlyExpenses._sum.amount ?? 0
+
+  // 고정비용 일할 계산
+  const totalFixedMonthly = fixedExpenses.reduce((sum: number, f: { amount: number }) => sum + f.amount, 0)
+  const fixedDaily = Math.round(totalFixedMonthly / daysInMonth)
+  const fixedMonthlyAccum = fixedDaily * dayOfMonth
+
+  const todayExpensesAmt = todayVariableExpenses + fixedDaily
+  const monthlyExpensesAmt = monthlyVariableExpenses + fixedMonthlyAccum
 
   const lowStockCount = lowStockItems as number
 
