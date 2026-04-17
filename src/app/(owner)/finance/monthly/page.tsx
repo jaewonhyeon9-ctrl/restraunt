@@ -65,20 +65,22 @@ export default function MonthlyFinancePage() {
 
       const expData = expRes.ok ? await expRes.json() : { expenses: [] }
       const saleData = saleRes.ok ? await saleRes.json() : { sales: [] }
-      const fixedData = fixedRes.ok ? await fixedRes.json() : { fixedExpenses: [] }
+      const fixedData = fixedRes.ok ? await fixedRes.json() : { fixedExpenses: [], wageEmployees: [], totalWages: 0 }
 
       const expenses: Array<{ expenseDate: string; amount: number; supplierId?: string; supplier?: { id: string; name: string } | null }> = expData.expenses || []
       const sales: Array<{ saleDate: string; amount: number }> = saleData.sales || []
       const fixedList: FixedExpenseItem[] = fixedData.fixedExpenses || []
+      const totalWages: number = fixedData.totalWages || 0
 
-      // 고정비용 월 총액
-      const totalFixed = fixedList.reduce((s: number, f: FixedExpenseItem) => s + f.amount, 0)
+      // 고정비용 월 총액 (월급제 직원 포함)
+      const totalFixed = fixedList.reduce((s: number, f: FixedExpenseItem) => s + f.amount, 0) + totalWages
 
       // 일별 집계
       const daysInMonth = new Date(year, month, 0).getDate()
       const fixedDailyAmount = fixedList
         .filter((f: FixedExpenseItem) => f.isDailyCalc)
         .reduce((s: number, f: FixedExpenseItem) => s + Math.round(f.amount / daysInMonth), 0)
+        + Math.round(totalWages / daysInMonth)
 
       const dayMap: Record<string, { sales: number; expenses: number }> = {}
       sales.forEach((s) => {

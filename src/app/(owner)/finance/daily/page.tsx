@@ -29,6 +29,12 @@ interface FixedExpenseItem {
   isDailyCalc: boolean
 }
 
+interface WageEmployee {
+  id: string
+  name: string
+  monthlyWage: number
+}
+
 interface DailySummary {
   sales: number
   expenses: number
@@ -85,6 +91,7 @@ export default function DailyFinancePage() {
     fixedDailyTotal: 0,
   })
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpenseItem[]>([])
+  const [wageEmployees, setWageEmployees] = useState<WageEmployee[]>([])
   const [expenses, setExpenses] = useState<ExpenseItem[]>([])
   const [sale, setSale] = useState<SaleData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -109,23 +116,27 @@ export default function DailyFinancePage() {
 
       const expData = expRes.ok ? await expRes.json() : { expenses: [] }
       const saleData = saleRes.ok ? await saleRes.json() : { sales: [] }
-      const fixedData = fixedRes.ok ? await fixedRes.json() : { fixedExpenses: [] }
+      const fixedData = fixedRes.ok ? await fixedRes.json() : { fixedExpenses: [], wageEmployees: [], totalWages: 0 }
 
       const expList: ExpenseItem[] = expData.expenses || []
       const saleItem: SaleData | null = saleData.sales?.[0] || null
       const fixedList: FixedExpenseItem[] = fixedData.fixedExpenses || []
+      const wageList: WageEmployee[] = fixedData.wageEmployees || []
+      const totalWages: number = fixedData.totalWages || 0
 
       setExpenses(expList)
       setSale(saleItem)
       setFixedExpenses(fixedList)
+      setWageEmployees(wageList)
 
       // 해당 월의 총 날짜 수 계산
       const [y, m] = selectedDate.split('-').map(Number)
       const daysInMonth = new Date(y, m, 0).getDate()
 
-      // 모든 고정비용의 일일 금액 (일할계산)
+      // 모든 고정비용의 일일 금액 (일할계산) + 월급제 직원 월급 일할
       const fixedDailyTotal = fixedList
         .reduce((s: number, f: FixedExpenseItem) => s + Math.round(f.amount / daysInMonth), 0)
+        + Math.round(totalWages / daysInMonth)
 
       const totalExpenses = expList.reduce((s: number, e: ExpenseItem) => s + e.amount, 0)
       const totalWithFixed = totalExpenses + fixedDailyTotal
@@ -293,6 +304,12 @@ export default function DailyFinancePage() {
                   { key: 'INGREDIENT', label: '식재료', value: summary.ingredientCost },
                   { key: 'WAGE', label: '인건비', value: summary.wageCost },
                   { key: 'FIXED', label: '고정비', value: summary.fixedCost },
+                  { key: 'WAGE_MONTHLY', label: '인건비(월급)', value: (() => {
+                    const [y, m] = selectedDate.split('-').map(Number)
+                    const daysInMonth = new Date(y, m, 0).getDate()
+                    const totalWages = wageEmployees.reduce((s, e) => s + e.monthlyWage, 0)
+                    return Math.round(totalWages / daysInMonth)
+                  })() },
                   { key: 'FIXED_DAILY', label: '고정비(일할)', value: summary.fixedDailyTotal },
                   { key: 'OTHER', label: '기타', value: summary.otherCost },
                 ].map((item) => (
@@ -351,7 +368,7 @@ export default function DailyFinancePage() {
             </div>
 
             {/* 고정비용 일할 내역 */}
-            {fixedExpenses.length > 0 && (
+            {(fixedExpenses.length > 0 || wageEmployees.length > 0) && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold text-gray-800">고정비용 (일할계산)</h2>
@@ -385,6 +402,28 @@ export default function DailyFinancePage() {
                         </div>
                       )
                     })}
+                  {/* 월급제 직원 인건비 */}
+                  {wageEmployees.map((emp) => {
+                    const [y, m] = selectedDate.split('-').map(Number)
+                    const daysInMonth = new Date(y, m, 0).getDate()
+                    const dailyWage = Math.round(emp.monthlyWage / daysInMonth)
+                    return (
+                      <div key={`wage-${emp.id}`} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 bg-blue-100 text-blue-700">
+                          월급
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-800 truncate">{emp.name}</p>
+                          <p className="text-xs text-gray-400">
+                            월 {formatCurrency(emp.monthlyWage)} / {daysInMonth}일
+                          </p>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900 shrink-0">
+                          {formatCurrency(dailyWage)}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
                 <div className="flex justify-between pt-3 mt-2 border-t border-gray-100">
                   <span className="text-sm font-semibold text-gray-700">일할 합계</span>

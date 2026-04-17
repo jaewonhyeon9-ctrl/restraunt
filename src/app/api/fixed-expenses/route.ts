@@ -16,12 +16,36 @@ export async function GET() {
       return NextResponse.json({ error: '식당 정보가 없습니다' }, { status: 400 })
     }
 
-    const fixedExpenses = await prisma.fixedExpense.findMany({
-      where: { restaurantId, isActive: true },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [fixedExpenses, wageEmployees] = await Promise.all([
+      prisma.fixedExpense.findMany({
+        where: { restaurantId, isActive: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.user.findMany({
+        where: {
+          restaurantId,
+          isActive: true,
+          monthlyWage: { not: null },
+        },
+        select: { id: true, name: true, monthlyWage: true },
+        orderBy: { name: 'asc' },
+      }),
+    ])
 
-    return NextResponse.json({ fixedExpenses })
+    const totalWages = wageEmployees.reduce(
+      (sum: number, e: { monthlyWage: number | null }) => sum + (e.monthlyWage ?? 0),
+      0
+    )
+
+    return NextResponse.json({
+      fixedExpenses,
+      wageEmployees: wageEmployees.map((e) => ({
+        id: e.id,
+        name: e.name,
+        monthlyWage: e.monthlyWage,
+      })),
+      totalWages,
+    })
   } catch (error) {
     console.error('GET /api/fixed-expenses error:', error)
     return NextResponse.json({ error: '고정비용 목록 조회 실패' }, { status: 500 })

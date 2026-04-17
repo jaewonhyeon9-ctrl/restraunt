@@ -43,6 +43,7 @@ export async function GET() {
     lowStockItems,
     todayAttendance,
     fixedExpenses,
+    wageAggregation,
   ] = await Promise.all([
     // 오늘 매출 (Sale 테이블은 날짜별 unique 레코드)
     prisma.sale.findFirst({
@@ -118,6 +119,16 @@ export async function GET() {
       where: { restaurantId, isActive: true },
       select: { amount: true },
     }),
+
+    // 월급제 직원 월급 합계
+    prisma.user.aggregate({
+      where: {
+        restaurantId,
+        isActive: true,
+        monthlyWage: { not: null },
+      },
+      _sum: { monthlyWage: true },
+    }),
   ])
 
   // ── 집계 ──────────────────────────────────────
@@ -126,8 +137,9 @@ export async function GET() {
   const monthlySalesAmt = monthlySales._sum.amount ?? 0
   const monthlyVariableExpenses = monthlyExpenses._sum.amount ?? 0
 
-  // 고정비용 일할 계산
-  const totalFixedMonthly = fixedExpenses.reduce((sum: number, f: { amount: number }) => sum + f.amount, 0)
+  // 고정비용 일할 계산 (월급제 직원 월급 포함)
+  const totalWages = wageAggregation._sum.monthlyWage ?? 0
+  const totalFixedMonthly = fixedExpenses.reduce((sum: number, f: { amount: number }) => sum + f.amount, 0) + totalWages
   const fixedDaily = Math.round(totalFixedMonthly / daysInMonth)
   const fixedMonthlyAccum = fixedDaily * dayOfMonth
 

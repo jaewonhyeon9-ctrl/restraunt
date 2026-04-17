@@ -13,6 +13,12 @@ interface FixedExpenseItem {
   isActive: boolean
 }
 
+interface WageEmployee {
+  id: string
+  name: string
+  monthlyWage: number
+}
+
 const CATEGORY_OPTIONS = [
   { value: 'RENT', label: '임대료' },
   { value: 'UTILITY', label: '공과금' },
@@ -54,6 +60,7 @@ const EMPTY_FORM = {
 export default function FixedExpensePage() {
   const router = useRouter()
   const [items, setItems] = useState<FixedExpenseItem[]>([])
+  const [wageEmployees, setWageEmployees] = useState<WageEmployee[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -68,6 +75,7 @@ export default function FixedExpensePage() {
       if (res.ok) {
         const data = await res.json()
         setItems(data.fixedExpenses || [])
+        setWageEmployees(data.wageEmployees || [])
       }
     } catch (e) {
       console.error(e)
@@ -143,6 +151,8 @@ export default function FixedExpensePage() {
   }
 
   const totalMonthly = items.reduce((s, i) => s + i.amount, 0)
+  const totalWages = wageEmployees.reduce((s, e) => s + e.monthlyWage, 0)
+  const totalWithWages = totalMonthly + totalWages
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -167,11 +177,16 @@ export default function FixedExpensePage() {
       <div className="max-w-md mx-auto px-4 py-4 space-y-4">
         {/* 월 총액 요약 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <p className="text-xs text-gray-500 mb-1">월 고정비용 합계</p>
-          <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalMonthly)}</p>
+          <p className="text-xs text-gray-500 mb-1">월 고정비용 합계 (인건비 포함)</p>
+          <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalWithWages)}</p>
           <p className="text-xs text-gray-400 mt-1">
-            일할계산 시 약 {formatCurrency(Math.round(totalMonthly / 30))}/일
+            일할계산 시 약 {formatCurrency(Math.round(totalWithWages / 30))}/일
           </p>
+          {totalWages > 0 && (
+            <p className="text-xs text-blue-500 mt-1">
+              수동 등록 {formatCurrency(totalMonthly)} + 월급 자동 {formatCurrency(totalWages)}
+            </p>
+          )}
         </div>
 
         {loading ? (
@@ -234,6 +249,45 @@ export default function FixedExpensePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        {/* 자동 포함: 월급제 직원 */}
+        {wageEmployees.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-4 py-3.5 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">자동</span>
+                <h2 className="text-sm font-semibold text-gray-800">월급제 직원 인건비</h2>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                직원 관리에서 등록된 월급이 자동으로 고정비에 포함됩니다
+              </p>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {wageEmployees.map((emp) => (
+                <div key={emp.id} className="px-4 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 shrink-0">
+                      월급
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{emp.name}</p>
+                      <span className="text-xs bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">일할계산</span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-gray-900">{formatCurrency(emp.monthlyWage)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        ~{formatCurrency(Math.round(emp.monthlyWage / 30))}/일
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+              <span className="text-sm font-semibold text-gray-700">월급 합계</span>
+              <span className="text-sm font-bold text-blue-600">{formatCurrency(totalWages)}</span>
             </div>
           </div>
         )}
