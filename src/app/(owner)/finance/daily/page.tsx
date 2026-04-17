@@ -123,9 +123,8 @@ export default function DailyFinancePage() {
       const [y, m] = selectedDate.split('-').map(Number)
       const daysInMonth = new Date(y, m, 0).getDate()
 
-      // 일할계산 적용되는 고정비용의 일일 금액
+      // 모든 고정비용의 일일 금액 (일할계산)
       const fixedDailyTotal = fixedList
-        .filter((f: FixedExpenseItem) => f.isDailyCalc)
         .reduce((s: number, f: FixedExpenseItem) => s + Math.round(f.amount / daysInMonth), 0)
 
       const totalExpenses = expList.reduce((s: number, e: ExpenseItem) => s + e.amount, 0)
@@ -352,7 +351,7 @@ export default function DailyFinancePage() {
             </div>
 
             {/* 고정비용 일할 내역 */}
-            {fixedExpenses.filter((f) => f.isDailyCalc).length > 0 && (
+            {fixedExpenses.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold text-gray-800">고정비용 (일할계산)</h2>
@@ -365,7 +364,6 @@ export default function DailyFinancePage() {
                 </div>
                 <div className="space-y-2">
                   {fixedExpenses
-                    .filter((f) => f.isDailyCalc)
                     .map((f) => {
                       const [y, m] = selectedDate.split('-').map(Number)
                       const daysInMonth = new Date(y, m, 0).getDate()
