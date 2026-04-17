@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 // ──────────────────────────────────────────────
 // 타입 정의
@@ -116,6 +117,21 @@ export default function DashboardPage() {
           <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
+
+      {/* 빠른 지출 등록 (영수증 촬영) */}
+      <Link
+        href="/finance/expenses/receipt"
+        className="flex items-center gap-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl px-5 py-4 shadow-sm transition-colors"
+      >
+        <span className="text-3xl">📸</span>
+        <div>
+          <p className="font-bold text-base">영수증 촬영</p>
+          <p className="text-xs text-white/80">사진으로 지출 등록 + 재고 입고</p>
+        </div>
+        <svg className="w-5 h-5 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
 
       {/* 안전재고 이하 알림 배너 */}
       {!loading && data && data.lowStockCount > 0 && (
