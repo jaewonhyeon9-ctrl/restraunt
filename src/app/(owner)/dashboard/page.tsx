@@ -61,22 +61,29 @@ function SummaryCard({
   value,
   color,
   loading,
+  href,
 }: {
   label: string
   value: number
   color: string
   loading: boolean
+  href?: string
 }) {
-  return (
-    <div className={`rounded-2xl p-4 ${color}`}>
+  const content = (
+    <div className={`rounded-2xl p-4 ${color} ${href ? 'active:opacity-80 cursor-pointer' : ''}`}>
       <p className="text-xs font-medium text-white/80 mb-1">{label}</p>
       {loading ? (
         <div className="h-7 w-24 bg-white/30 rounded-lg animate-pulse" />
       ) : (
         <p className="text-xl font-bold text-white">{formatKRW(value)}</p>
       )}
+      {href && <p className="text-[10px] text-white/60 mt-1">상세보기 &gt;</p>}
     </div>
   )
+  if (href) {
+    return <Link href={href}>{content}</Link>
+  }
+  return content
 }
 
 // ──────────────────────────────────────────────
@@ -157,12 +164,14 @@ export default function DashboardPage() {
             value={data?.today.sales ?? 0}
             color="bg-blue-500"
             loading={loading}
+            href="/finance/daily"
           />
           <SummaryCard
             label="지출"
             value={data?.today.expenses ?? 0}
             color="bg-rose-500"
             loading={loading}
+            href="/finance/daily"
           />
           <SummaryCard
             label="순이익"
@@ -178,10 +187,12 @@ export default function DashboardPage() {
       </section>
 
       {/* 이번 달 누적 손익 */}
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
-          이번 달 누적
-        </h2>
+      <Link href="/finance/monthly" className="block">
+      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm active:bg-gray-50 cursor-pointer">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-sm font-semibold text-gray-700">이번 달 누적</h2>
+          <span className="text-xs text-gray-400">상세보기 &gt;</span>
+        </div>
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -217,6 +228,7 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+      </Link>
 
       {/* 직원 출퇴근 현황 */}
       <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
