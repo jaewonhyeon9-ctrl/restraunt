@@ -16,7 +16,12 @@
       "Bash(echo \"exit: $?\")",
       "Bash(cmd.exe *)",
       "Bash(powershell.exe -Command \"Stop-Process -Id 12740 -Force\")",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(dir C:\\\\Users\\\\Hyun Jae Won\\\\Desktop\\\\restaurant-app\\\\src\\\\app\\\\api *)",
+      "Bash(/usr/bin/mkdir -p src/app/api/fixed-expenses/\\\\[id\\\\])",
+      "Bash(/usr/bin/mkdir -p \"src/app/\\(owner\\)/finance/fixed\")",
+      "Bash(npx tsc *)",
+      "Bash(./node_modules/.bin/tsc --noEmit --pretty)"
     ]
   }
 }

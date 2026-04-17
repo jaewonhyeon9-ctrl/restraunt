@@ -21,6 +21,14 @@ interface SaleData {
   note: string | null
 }
 
+interface FixedExpenseItem {
+  id: string
+  name: string
+  category: string
+  amount: number
+  isDailyCalc: boolean
+}
+
 interface DailySummary {
   sales: number
   expenses: number
@@ -29,6 +37,7 @@ interface DailySummary {
   wageCost: number
   fixedCost: number
   otherCost: number
+  fixedDailyTotal: number
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -73,7 +82,9 @@ export default function DailyFinancePage() {
   const [summary, setSummary] = useState<DailySummary>({
     sales: 0, expenses: 0, netProfit: 0,
     ingredientCost: 0, wageCost: 0, fixedCost: 0, otherCost: 0,
+    fixedDailyTotal: 0,
   })
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpenseItem[]>([])
   const [expenses, setExpenses] = useState<ExpenseItem[]>([])
   const [sale, setSale] = useState<SaleData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -90,31 +101,46 @@ export default function DailyFinancePage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [expRes, saleRes] = await Promise.all([
+      const [expRes, saleRes, fixedRes] = await Promise.all([
         fetch(`/api/expenses?date=${selectedDate}`),
         fetch(`/api/sales?date=${selectedDate}`),
+        fetch('/api/fixed-expenses'),
       ])
 
       const expData = expRes.ok ? await expRes.json() : { expenses: [] }
       const saleData = saleRes.ok ? await saleRes.json() : { sales: [] }
+      const fixedData = fixedRes.ok ? await fixedRes.json() : { fixedExpenses: [] }
 
       const expList: ExpenseItem[] = expData.expenses || []
       const saleItem: SaleData | null = saleData.sales?.[0] || null
+      const fixedList: FixedExpenseItem[] = fixedData.fixedExpenses || []
 
       setExpenses(expList)
       setSale(saleItem)
+      setFixedExpenses(fixedList)
+
+      // 해당 월의 총 날짜 수 계산
+      const [y, m] = selectedDate.split('-').map(Number)
+      const daysInMonth = new Date(y, m, 0).getDate()
+
+      // 일할계산 적용되는 고정비용의 일일 금액
+      const fixedDailyTotal = fixedList
+        .filter((f: FixedExpenseItem) => f.isDailyCalc)
+        .reduce((s: number, f: FixedExpenseItem) => s + Math.round(f.amount / daysInMonth), 0)
 
       const totalExpenses = expList.reduce((s: number, e: ExpenseItem) => s + e.amount, 0)
+      const totalWithFixed = totalExpenses + fixedDailyTotal
       const totalSales = saleItem?.amount ?? 0
 
       setSummary({
         sales: totalSales,
-        expenses: totalExpenses,
-        netProfit: totalSales - totalExpenses,
+        expenses: totalWithFixed,
+        netProfit: totalSales - totalWithFixed,
         ingredientCost: expList.filter((e) => e.category === 'INGREDIENT').reduce((s, e) => s + e.amount, 0),
         wageCost: expList.filter((e) => e.category === 'WAGE').reduce((s, e) => s + e.amount, 0),
         fixedCost: expList.filter((e) => ['UTILITY', 'RENT', 'EQUIPMENT'].includes(e.category)).reduce((s, e) => s + e.amount, 0),
         otherCost: expList.filter((e) => e.category === 'OTHER').reduce((s, e) => s + e.amount, 0),
+        fixedDailyTotal,
       })
     } catch (e) {
       console.error(e)
@@ -268,6 +294,7 @@ export default function DailyFinancePage() {
                   { key: 'INGREDIENT', label: '식재료', value: summary.ingredientCost },
                   { key: 'WAGE', label: '인건비', value: summary.wageCost },
                   { key: 'FIXED', label: '고정비', value: summary.fixedCost },
+                  { key: 'FIXED_DAILY', label: '고정비(일할)', value: summary.fixedDailyTotal },
                   { key: 'OTHER', label: '기타', value: summary.otherCost },
                 ].map((item) => (
                   <div key={item.key} className="flex items-center gap-2">
@@ -323,6 +350,50 @@ export default function DailyFinancePage() {
                 </div>
               )}
             </div>
+
+            {/* 고정비용 일할 내역 */}
+            {fixedExpenses.filter((f) => f.isDailyCalc).length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-gray-800">고정비용 (일할계산)</h2>
+                  <span className="text-xs text-gray-400">
+                    {(() => {
+                      const [y, m] = selectedDate.split('-').map(Number)
+                      return new Date(y, m, 0).getDate()
+                    })()}일 기준
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {fixedExpenses
+                    .filter((f) => f.isDailyCalc)
+                    .map((f) => {
+                      const [y, m] = selectedDate.split('-').map(Number)
+                      const daysInMonth = new Date(y, m, 0).getDate()
+                      const dailyAmount = Math.round(f.amount / daysInMonth)
+                      return (
+                        <div key={f.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${CATEGORY_COLOR[f.category] || CATEGORY_COLOR.OTHER}`}>
+                            {CATEGORY_LABEL[f.category] || '기타'}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-800 truncate">{f.name}</p>
+                            <p className="text-xs text-gray-400">
+                              월 {formatCurrency(f.amount)} / {daysInMonth}일
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900 shrink-0">
+                            {formatCurrency(dailyAmount)}
+                          </span>
+                        </div>
+                      )
+                    })}
+                </div>
+                <div className="flex justify-between pt-3 mt-2 border-t border-gray-100">
+                  <span className="text-sm font-semibold text-gray-700">일할 합계</span>
+                  <span className="text-sm font-bold text-gray-900">{formatCurrency(summary.fixedDailyTotal)}</span>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

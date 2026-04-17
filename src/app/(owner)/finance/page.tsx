@@ -13,6 +13,12 @@ const MENU_ITEMS = [
     title: '월별 누적',
     description: '월간 손익 분석',
   },
+  {
+    href: '/finance/fixed',
+    emoji: '📌',
+    title: '고정비용 관리',
+    description: '월세, 공과금, 인건비 등 고정 지출',
+  },
 ]
 
 export default function FinancePage() {

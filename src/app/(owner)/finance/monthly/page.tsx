@@ -16,13 +16,24 @@ interface SupplierSummary {
   total: number
 }
 
+interface FixedExpenseItem {
+  id: string
+  name: string
+  category: string
+  amount: number
+  isDailyCalc: boolean
+}
+
 interface MonthlySummary {
   totalSales: number
   totalExpenses: number
+  totalFixed: number
+  totalAll: number
   netProfit: number
   profitMargin: number
   dailyRows: DailyRow[]
   supplierSummaries: SupplierSummary[]
+  fixedExpenses: FixedExpenseItem[]
 }
 
 function formatCurrency(n: number): string {
@@ -46,18 +57,29 @@ export default function MonthlyFinancePage() {
     setLoading(true)
     try {
       const monthStr = `${year}-${String(month).padStart(2, '0')}`
-      const [expRes, saleRes] = await Promise.all([
+      const [expRes, saleRes, fixedRes] = await Promise.all([
         fetch(`/api/expenses?month=${monthStr}`),
         fetch(`/api/sales?month=${monthStr}`),
+        fetch('/api/fixed-expenses'),
       ])
 
       const expData = expRes.ok ? await expRes.json() : { expenses: [] }
       const saleData = saleRes.ok ? await saleRes.json() : { sales: [] }
+      const fixedData = fixedRes.ok ? await fixedRes.json() : { fixedExpenses: [] }
 
       const expenses: Array<{ expenseDate: string; amount: number; supplierId?: string; supplier?: { id: string; name: string } | null }> = expData.expenses || []
       const sales: Array<{ saleDate: string; amount: number }> = saleData.sales || []
+      const fixedList: FixedExpenseItem[] = fixedData.fixedExpenses || []
+
+      // 고정비용 월 총액
+      const totalFixed = fixedList.reduce((s: number, f: FixedExpenseItem) => s + f.amount, 0)
 
       // 일별 집계
+      const daysInMonth = new Date(year, month, 0).getDate()
+      const fixedDailyAmount = fixedList
+        .filter((f: FixedExpenseItem) => f.isDailyCalc)
+        .reduce((s: number, f: FixedExpenseItem) => s + Math.round(f.amount / daysInMonth), 0)
+
       const dayMap: Record<string, { sales: number; expenses: number }> = {}
       sales.forEach((s) => {
         const d = s.saleDate.slice(0, 10)
@@ -70,13 +92,14 @@ export default function MonthlyFinancePage() {
         dayMap[d].expenses += e.amount
       })
 
+      // 각 일별 행에 고정비 일할분 추가
       const dailyRows: DailyRow[] = Object.entries(dayMap)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, v]) => ({
           date,
           sales: v.sales,
-          expenses: v.expenses,
-          netProfit: v.sales - v.expenses,
+          expenses: v.expenses + fixedDailyAmount,
+          netProfit: v.sales - v.expenses - fixedDailyAmount,
         }))
 
       // 거래처별 집계
@@ -95,10 +118,11 @@ export default function MonthlyFinancePage() {
 
       const totalSales = sales.reduce((s, i) => s + i.amount, 0)
       const totalExpenses = expenses.reduce((s, i) => s + i.amount, 0)
-      const netProfit = totalSales - totalExpenses
+      const totalAll = totalExpenses + totalFixed
+      const netProfit = totalSales - totalAll
       const profitMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0
 
-      setSummary({ totalSales, totalExpenses, netProfit, profitMargin, dailyRows, supplierSummaries })
+      setSummary({ totalSales, totalExpenses, totalFixed, totalAll, netProfit, profitMargin, dailyRows, supplierSummaries, fixedExpenses: fixedList })
     } catch (e) {
       console.error(e)
     } finally {
@@ -166,11 +190,13 @@ export default function MonthlyFinancePage() {
           </div>
         ) : summary ? (
           <>
-            {/* 요약 카드 4개 */}
+            {/* 요약 카드 */}
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: '누적 매출', value: formatCurrency(summary.totalSales), color: 'text-gray-900' },
-                { label: '누적 지출', value: formatCurrency(summary.totalExpenses), color: 'text-red-500' },
+                { label: '변동 지출', value: formatCurrency(summary.totalExpenses), color: 'text-red-500' },
+                { label: '고정비용', value: formatCurrency(summary.totalFixed), color: 'text-purple-600' },
+                { label: '총 지출', value: formatCurrency(summary.totalAll), color: 'text-red-600' },
                 { label: '순이익', value: formatCurrency(summary.netProfit), color: summary.netProfit >= 0 ? 'text-blue-600' : 'text-red-500' },
                 { label: '수익률', value: formatPercent(summary.profitMargin), color: summary.profitMargin >= 0 ? 'text-green-600' : 'text-red-500' },
               ].map((card) => (
@@ -180,6 +206,30 @@ export default function MonthlyFinancePage() {
                 </div>
               ))}
             </div>
+
+            {/* 고정비용 상세 */}
+            {summary.fixedExpenses.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <h2 className="text-sm font-semibold text-gray-800 mb-3">고정비용 내역</h2>
+                <div className="space-y-2">
+                  {summary.fixedExpenses.map((f) => (
+                    <div key={f.id} className="flex justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-700 font-medium">{f.name}</span>
+                        {f.isDailyCalc && (
+                          <span className="text-xs bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">일할</span>
+                        )}
+                      </div>
+                      <span className="font-semibold text-gray-900">{formatCurrency(f.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between pt-3 mt-2 border-t border-gray-200">
+                  <span className="text-sm font-semibold text-gray-700">고정비용 합계</span>
+                  <span className="text-sm font-bold text-purple-600">{formatCurrency(summary.totalFixed)}</span>
+                </div>
+              </div>
+            )}
 
             {/* 탭 */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
