@@ -102,10 +102,12 @@ export default function DashboardPage() {
     const fetchSummary = async () => {
       try {
         const res = await fetch('/api/dashboard/summary')
-        if (!res.ok) throw new Error('데이터를 불러오지 못했습니다.')
-        const json = await res.json()
+        const json = await res.json().catch(() => null)
+        if (!res.ok) {
+          const detail = json?.detail ? ` (${json.detail})` : ''
+          throw new Error(`${json?.error ?? '데이터를 불러오지 못했습니다.'}${detail}`)
+        }
         setData(json)
-        // summary API가 pendingOrderCount를 반환하면 그대로 사용
         if (typeof json.pendingOrderCount === 'number') {
           setPendingOrderCount(json.pendingOrderCount)
         }

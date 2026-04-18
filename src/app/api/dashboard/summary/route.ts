@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET() {
+  try {
   // ── 인증 확인 ──────────────────────────────────
   const session = await auth()
   if (!session?.user) {
@@ -44,7 +45,6 @@ export async function GET() {
     todayAttendance,
     fixedExpenses,
     wageAggregation,
-    pendingOrderCount,
   ] = await Promise.all([
     // 오늘 매출 (Sale 테이블은 날짜별 unique 레코드)
     prisma.sale.findFirst({
@@ -130,12 +130,17 @@ export async function GET() {
       },
       _sum: { monthlyWage: true },
     }),
-
-    // 대기 중인 발주 건수
-    prisma.purchaseOrder.count({
-      where: { restaurantId, status: 'PENDING' },
-    }),
   ])
+
+  // 대기 중인 발주 건수 (실패해도 대시보드는 계속 동작)
+  let pendingOrderCount = 0
+  try {
+    pendingOrderCount = await prisma.purchaseOrder.count({
+      where: { restaurantId, status: 'PENDING' },
+    })
+  } catch (e) {
+    console.error('pendingOrderCount query failed:', e)
+  }
 
   // ── 집계 ──────────────────────────────────────
   const todaySalesAmt = todaySale?.amount ?? 0
@@ -176,4 +181,12 @@ export async function GET() {
     pendingOrderCount,
     todayAttendance: attendanceList,
   })
+  } catch (e) {
+    console.error('[dashboard/summary] error:', e)
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json(
+      { error: '서버 오류', detail: msg },
+      { status: 500 }
+    )
+  }
 }
