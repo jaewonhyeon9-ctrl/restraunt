@@ -15,10 +15,11 @@ interface ChecklistPreview {
   completed: number
 }
 
-// 식당 GPS 좌표 (환경변수 또는 세션에서 가져오는 것이 이상적이나, 여기선 API 응답에서 활용)
-const RESTAURANT_LAT = Number(process.env.NEXT_PUBLIC_RESTAURANT_LAT ?? 37.5665)
-const RESTAURANT_LNG = Number(process.env.NEXT_PUBLIC_RESTAURANT_LNG ?? 126.978)
-const GPS_RADIUS = 50
+interface RestaurantLocation {
+  lat: number | null
+  lng: number | null
+  gpsRadius: number
+}
 
 function formatTime(iso: string | null): string {
   if (!iso) return '--:--'
@@ -33,13 +34,34 @@ function formatWorkTime(minutes: number): string {
 
 export default function EmployeeHomePage() {
   const { data: session } = useSession()
-  const geo = useGeolocation(RESTAURANT_LAT, RESTAURANT_LNG, GPS_RADIUS)
+
+  const [restaurant, setRestaurant] = useState<RestaurantLocation | null>(null)
+  const geo = useGeolocation(
+    restaurant?.lat ?? undefined,
+    restaurant?.lng ?? undefined,
+    restaurant?.gpsRadius ?? 50
+  )
 
   const [attendance, setAttendance] = useState<AttendanceStatus | null>(null)
   const [checklist, setChecklist] = useState<ChecklistPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(new Date())
+
+  useEffect(() => {
+    const fetchRestaurant = async () => {
+      try {
+        const res = await fetch('/api/restaurant')
+        if (res.ok) {
+          const data = await res.json()
+          setRestaurant({ lat: data.lat, lng: data.lng, gpsRadius: data.gpsRadius ?? 50 })
+        }
+      } catch {
+        // 무시
+      }
+    }
+    fetchRestaurant()
+  }, [])
 
   // 현재 시각 갱신
   useEffect(() => {
@@ -81,12 +103,16 @@ export default function EmployeeHomePage() {
   }, [fetchAttendance, fetchChecklist])
 
   const handleAttendance = async (type: 'in' | 'out') => {
+    if (restaurant && (restaurant.lat == null || restaurant.lng == null)) {
+      setError('사장님이 아직 식당 위치를 설정하지 않았습니다.')
+      return
+    }
     if (!geo.lat || !geo.lng) {
       setError('GPS 위치를 확인할 수 없습니다.')
       return
     }
     if (!geo.isWithinRange) {
-      setError('식당 반경 50m 이내에서만 출퇴근이 가능합니다.')
+      setError(`식당 반경 ${restaurant?.gpsRadius ?? 50}m 이내에서만 출퇴근이 가능합니다.`)
       return
     }
     setError(null)
@@ -137,7 +163,9 @@ export default function EmployeeHomePage() {
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-3">
           <span className="font-semibold text-gray-700 text-sm">📍 내 위치</span>
-          {geo.loading ? (
+          {restaurant && (restaurant.lat == null || restaurant.lng == null) ? (
+            <span className="text-xs text-amber-600">식당 위치 미설정</span>
+          ) : geo.loading ? (
             <span className="text-xs text-gray-400">위치 확인 중...</span>
           ) : geo.error ? (
             <span className="text-xs text-red-500">{geo.error}</span>
