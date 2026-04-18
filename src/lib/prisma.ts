@@ -8,7 +8,11 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString })
+  const adapter = new PrismaPg({
+    connectionString,
+    max: 1,
+    idleTimeoutMillis: 10_000,
+  })
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
