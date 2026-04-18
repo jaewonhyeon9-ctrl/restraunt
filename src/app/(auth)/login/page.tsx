@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -26,7 +26,9 @@ export default function LoginPage() {
       if (result?.error) {
         setError('이메일 또는 비밀번호가 올바르지 않습니다.')
       } else {
-        router.push('/dashboard')
+        const session = await getSession()
+        const role = (session?.user as { role?: string } | undefined)?.role
+        router.push(role === 'OWNER' ? '/dashboard' : '/home')
         router.refresh()
       }
     } catch {

@@ -212,8 +212,14 @@ export default function ReceiptOCRPage() {
                       <Webcam
                         ref={webcamRef}
                         screenshotFormat="image/jpeg"
-                        screenshotQuality={0.9}
-                        videoConstraints={{ facingMode: { ideal: 'environment' }, aspectRatio: 4 / 3 }}
+                        screenshotQuality={0.95}
+                        forceScreenshotSourceSize
+                        videoConstraints={{
+                          facingMode: { ideal: 'environment' },
+                          width: { ideal: 1920 },
+                          height: { ideal: 1440 },
+                          aspectRatio: 4 / 3,
+                        }}
                         onUserMediaError={() => setCameraError(true)}
                         className="w-full rounded-none"
                       />

@@ -1,4 +1,5 @@
 import TabItem from '@/components/owner/TabItem'
+import OwnerHeader from '@/components/owner/OwnerHeader'
 
 const TAB_ITEMS = [
   { href: '/dashboard', label: '대시보드', icon: '📊' },
@@ -15,6 +16,8 @@ export default function OwnerLayout({
 }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <OwnerHeader />
+
       {/* 메인 콘텐츠 영역 (하단 탭바 높이만큼 패딩) */}
       <main className="flex-1 pb-20 max-w-md mx-auto w-full">
         {children}
