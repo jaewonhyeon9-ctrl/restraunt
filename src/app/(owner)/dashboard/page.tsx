@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import RestaurantLocationCard from '@/components/owner/RestaurantLocationCard'
+import PendingOrdersCard from '@/components/owner/PendingOrdersCard'
 
 // ──────────────────────────────────────────────
 // 타입 정의
@@ -25,6 +27,7 @@ interface DashboardSummary {
     netProfit: number
   }
   lowStockCount: number
+  pendingOrderCount?: number
   todayAttendance: AttendanceRecord[]
 }
 
@@ -91,6 +94,7 @@ function SummaryCard({
 // ──────────────────────────────────────────────
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardSummary | null>(null)
+  const [pendingOrderCount, setPendingOrderCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -101,13 +105,33 @@ export default function DashboardPage() {
         if (!res.ok) throw new Error('데이터를 불러오지 못했습니다.')
         const json = await res.json()
         setData(json)
+        // summary API가 pendingOrderCount를 반환하면 그대로 사용
+        if (typeof json.pendingOrderCount === 'number') {
+          setPendingOrderCount(json.pendingOrderCount)
+        }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : '오류가 발생했습니다.')
       } finally {
         setLoading(false)
       }
     }
+
+    // summary에 없으면 별도 fetch (PENDING 발주 개수)
+    const fetchPendingOrders = async () => {
+      try {
+        const res = await fetch('/api/orders?status=PENDING')
+        if (!res.ok) return
+        const json = await res.json()
+        if (Array.isArray(json)) {
+          setPendingOrderCount(json.length)
+        }
+      } catch {
+        // 조용히 무시
+      }
+    }
+
     fetchSummary()
+    fetchPendingOrders()
   }, [])
 
   return (
@@ -139,6 +163,11 @@ export default function DashboardPage() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </Link>
+
+      {/* 대기 중 발주 요청 카드 */}
+      {!loading && pendingOrderCount > 0 && (
+        <PendingOrdersCard count={pendingOrderCount} />
+      )}
 
       {/* 안전재고 이하 알림 배너 */}
       {!loading && data && data.lowStockCount > 0 && (
@@ -229,6 +258,9 @@ export default function DashboardPage() {
         )}
       </section>
       </Link>
+
+      {/* 식당 위치 설정 */}
+      <RestaurantLocationCard />
 
       {/* 직원 출퇴근 현황 */}
       <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">

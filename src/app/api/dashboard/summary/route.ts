@@ -44,6 +44,7 @@ export async function GET() {
     todayAttendance,
     fixedExpenses,
     wageAggregation,
+    pendingOrderCount,
   ] = await Promise.all([
     // 오늘 매출 (Sale 테이블은 날짜별 unique 레코드)
     prisma.sale.findFirst({
@@ -129,6 +130,11 @@ export async function GET() {
       },
       _sum: { monthlyWage: true },
     }),
+
+    // 대기 중인 발주 건수
+    prisma.purchaseOrder.count({
+      where: { restaurantId, status: 'PENDING' },
+    }),
   ])
 
   // ── 집계 ──────────────────────────────────────
@@ -167,6 +173,7 @@ export async function GET() {
       netProfit: monthlySalesAmt - monthlyExpensesAmt,
     },
     lowStockCount,
+    pendingOrderCount,
     todayAttendance: attendanceList,
   })
 }
