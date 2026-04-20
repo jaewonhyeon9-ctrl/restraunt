@@ -401,25 +401,25 @@ export default function ReceiptOCRPage() {
             </div>
 
             {/* 품목 목록 */}
-            {editItems.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-gray-800">품목 목록</h2>
-                  <button onClick={addItem} className="text-xs text-orange-500 font-medium">+ 추가</button>
-                </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-800">품목 목록</h2>
+                <button onClick={addItem} className="text-xs text-orange-500 font-medium">+ 추가</button>
+              </div>
 
+              {editItems.length > 0 ? (
                 <div className="space-y-3">
                   {editItems.map((item, idx) => (
                     <div key={idx} className="bg-gray-50 rounded-xl p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <input
-                          type="text"
+                      <div className="flex items-start gap-2">
+                        <textarea
                           value={item.name}
                           onChange={(e) => updateItem(idx, 'name', e.target.value)}
                           placeholder="품목명"
-                          className="flex-1 px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400 bg-white mr-2"
+                          rows={2}
+                          className="flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400 bg-white resize-y"
                         />
-                        <button onClick={() => removeItem(idx)} className="p-1 text-gray-400 hover:text-red-400">
+                        <button onClick={() => removeItem(idx)} className="shrink-0 p-1 text-gray-400 hover:text-red-400">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
@@ -457,14 +457,12 @@ export default function ReceiptOCRPage() {
                     </div>
                   ))}
                 </div>
-
-                {editItems.length === 0 && (
-                  <button onClick={addItem} className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-orange-300 hover:text-orange-400 transition-colors">
-                    + 품목 추가
-                  </button>
-                )}
-              </div>
-            )}
+              ) : (
+                <button onClick={addItem} className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-orange-300 hover:text-orange-400 transition-colors">
+                  + 품목 추가
+                </button>
+              )}
+            </div>
 
             {/* 재고 자동 입고 */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
