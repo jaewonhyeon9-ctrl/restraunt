@@ -10,8 +10,12 @@ export const proxy = auth((req) => {
   const { pathname } = req.nextUrl
   const user = req.auth?.user as { role?: string } | undefined
 
+  // 공개 경로 (로그인 없이 접근 가능)
+  const PUBLIC_PATHS = ['/login', '/api/auth', '/privacy', '/terms', '/offline']
+  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
+
   // 인증 안 된 경우
-  if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/api/auth')) {
+  if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
@@ -40,5 +44,7 @@ export const proxy = auth((req) => {
 })
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icons|manifest.json).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon\\.ico|icons|sw\\.js|manifest\\.webmanifest|offline|apple-icon\\.png|icon-192\\.png|icon-512\\.png|icon-maskable-512\\.png|feature-graphic-1024x500\\.png|\\.well-known).*)',
+  ],
 }

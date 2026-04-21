@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.dechalkak.app",
+        "sha256_cert_fingerprints": ["5F:98:30:99:8C:46:8E:23:B3:76:0D:75:06:C2:C7:B2:F6:8D:1E:FA:3B:21:F9:13:8F:1E:3C:0C:4A:AB:89:3F"]
+      }
+    }]
