@@ -39,6 +39,7 @@ export default function ReceiptOCRPage() {
   const [supplierInput, setSupplierInput] = useState('')
   const [autoInventory, setAutoInventory] = useState(true)
   const [expenseCategory, setExpenseCategory] = useState('INGREDIENT')
+  const [receiptType, setReceiptType] = useState<'TAX_INVOICE' | 'CARD' | 'CASH_RECEIPT' | 'SIMPLE' | 'NONE'>('CARD')
   const [description, setDescription] = useState('')
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -129,6 +130,7 @@ export default function ReceiptOCRPage() {
           supplierId,
           supplierName: supplierId ? undefined : (supplierInput || undefined),
           category: expenseCategory,
+          receiptType,
           amount: Number(editTotal) || 0,
           expenseDate: editDate,
           description: description || undefined,
@@ -343,6 +345,21 @@ export default function ReceiptOCRPage() {
                   <option value="RENT">임대료</option>
                   <option value="EQUIPMENT">설비</option>
                   <option value="OTHER">기타</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">증빙 유형 (부가세 공제 기준)</label>
+                <select
+                  value={receiptType}
+                  onChange={(e) => setReceiptType(e.target.value as typeof receiptType)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                >
+                  <option value="CARD">카드매입전표 (공제 O)</option>
+                  <option value="TAX_INVOICE">세금계산서 (공제 O)</option>
+                  <option value="CASH_RECEIPT">현금영수증-사업자 (공제 O)</option>
+                  <option value="SIMPLE">간이영수증 (공제 X)</option>
+                  <option value="NONE">증빙없음 (공제 X)</option>
                 </select>
               </div>
 

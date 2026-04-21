@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import type { ExpenseCategory } from '@prisma/client'
+import type { ExpenseCategory, ReceiptType } from '@prisma/client'
+
+const VAT_DEDUCTIBLE_TYPES: ReceiptType[] = ['TAX_INVOICE', 'CARD', 'CASH_RECEIPT']
 
 // GET: 지출 목록 조회 (날짜 또는 월 필터)
 export async function GET(req: NextRequest) {
@@ -81,6 +83,7 @@ export async function POST(req: NextRequest) {
       supplierId,
       supplierName,
       category,
+      receiptType,
       amount,
       expenseDate,
       description,
@@ -91,6 +94,7 @@ export async function POST(req: NextRequest) {
       supplierId?: string
       supplierName?: string
       category: ExpenseCategory
+      receiptType?: ReceiptType
       amount: number
       expenseDate: string
       description?: string
@@ -103,6 +107,9 @@ export async function POST(req: NextRequest) {
         totalPrice: number
       }>
     }
+
+    const resolvedReceiptType: ReceiptType = receiptType ?? 'NONE'
+    const isVatDeductible = VAT_DEDUCTIBLE_TYPES.includes(resolvedReceiptType)
 
     if (!category || !amount || !expenseDate) {
       return NextResponse.json({ error: '필수 항목이 누락되었습니다' }, { status: 400 })
@@ -140,6 +147,8 @@ export async function POST(req: NextRequest) {
         supplierId: resolvedSupplierId,
         receiptId: receiptId || null,
         category,
+        receiptType: resolvedReceiptType,
+        isVatDeductible,
         amount,
         expenseDate: new Date(expenseDate),
         description: description || null,

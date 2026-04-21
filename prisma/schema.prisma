@@ -269,6 +269,9 @@ model Expense {
   description    String?
   isFixed        Boolean         @default(false)
   fixedExpenseId String?
+  // 세무: 매입세액공제 여부 + 증빙 유형
+  isVatDeductible Boolean        @default(true)
+  receiptType    ReceiptType     @default(NONE)
   createdAt      DateTime        @default(now())
 
   restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -285,6 +288,14 @@ enum ExpenseCategory {
   RENT
   EQUIPMENT
   OTHER
+}
+
+enum ReceiptType {
+  TAX_INVOICE   // 세금계산서
+  CARD          // 신용카드/체크카드 매입전표
+  CASH_RECEIPT  // 현금영수증(사업자)
+  SIMPLE        // 간이영수증(공제불가)
+  NONE          // 증빙없음
 }
 
 // 고정지출 마스터

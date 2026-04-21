@@ -19,6 +19,12 @@ const MENU_ITEMS = [
     title: '고정비용 관리',
     description: '월세, 공과금, 인건비 등 고정 지출',
   },
+  {
+    href: '/finance/tax',
+    emoji: '🧾',
+    title: '세무 자동 계산',
+    description: '부가세·종합소득세 예상액 실시간',
+  },
 ]
 
 export default function FinancePage() {
