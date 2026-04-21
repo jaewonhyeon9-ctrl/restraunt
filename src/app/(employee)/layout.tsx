@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 
 const tabs = [
   { href: '/home', label: '홈', icon: '🏠' },
@@ -17,9 +18,26 @@ export default function EmployeeLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const isOwnerPreviewing = (session?.user as { role?: string } | undefined)?.role === 'OWNER'
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* 사장이 직원 화면 보고 있을 때 상단 띠 */}
+      {isOwnerPreviewing && (
+        <div className="bg-blue-50 border-b border-blue-200">
+          <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
+            <span className="text-xs text-blue-700 font-medium">👁️ 사장님이 직원 화면을 보는 중</span>
+            <Link
+              href="/dashboard"
+              className="text-xs text-blue-700 hover:text-blue-900 px-2 py-1 rounded font-semibold"
+            >
+              사장 화면으로 ←
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* 상단 헤더 */}
       <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">

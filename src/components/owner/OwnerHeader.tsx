@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { signOut, useSession } from 'next-auth/react'
 
 export default function OwnerHeader() {
@@ -20,12 +21,20 @@ export default function OwnerHeader() {
             {session?.user?.name ?? '사장'}님
           </span>
         </div>
-        <button
-          onClick={handleLogout}
-          className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          로그아웃
-        </button>
+        <div className="flex items-center gap-1">
+          <Link
+            href="/home"
+            className="text-xs text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+          >
+            👥 직원 화면
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            로그아웃
+          </button>
+        </div>
       </div>
     </header>
   )
