@@ -32,11 +32,8 @@ export const proxy = auth((req) => {
       return NextResponse.redirect(new URL('/home', req.url))
     }
 
-    // 사장이 직원 전용 페이지 접근 시
-    const isEmployeePath = EMPLOYEE_ONLY.some((p) => pathname === p || pathname.startsWith(p + '/'))
-    if (role === 'OWNER' && isEmployeePath) {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
+    // 사장은 직원 전용 페이지도 미리보기 가능 (관리 목적)
+    // EMPLOYEE_ONLY 경로 접근 차단 안 함
   }
 
   return NextResponse.next()
