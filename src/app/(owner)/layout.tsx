@@ -15,17 +15,15 @@ export default function OwnerLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <OwnerHeader />
 
-      {/* 메인 콘텐츠 영역 (하단 탭바 높이만큼 패딩) */}
-      <main className="flex-1 pb-20 max-w-md mx-auto w-full">
+      <main className="flex-1 pb-24 max-w-md mx-auto w-full">
         {children}
       </main>
 
-      {/* 하단 탭바 */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
-        <div className="max-w-md mx-auto flex items-stretch h-16">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/5 bg-[rgba(7,9,14,0.72)] backdrop-blur-xl">
+        <div className="mx-auto max-w-md flex items-stretch h-16 pb-[env(safe-area-inset-bottom)]">
           {TAB_ITEMS.map((item) => (
             <TabItem
               key={item.href}

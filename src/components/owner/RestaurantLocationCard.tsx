@@ -103,8 +103,8 @@ export default function RestaurantLocationCard() {
 
   if (loading) {
     return (
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-        <div className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+      <section className="glass-card p-4">
+        <div className="h-20 bg-white/5 rounded-xl animate-pulse" />
       </section>
     )
   }
@@ -112,41 +112,44 @@ export default function RestaurantLocationCard() {
   const hasLocation = info?.lat != null && info?.lng != null
 
   return (
-    <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+    <section className="glass-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-700">📍 식당 위치</h2>
+        <h2 className="text-sm font-semibold text-slate-200">📍 식당 위치</h2>
         <span
-          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-            hasLocation ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+          className={`text-[11px] font-medium px-2 py-0.5 rounded-full ring-1 ${
+            hasLocation
+              ? 'text-emerald-300 bg-emerald-500/10 ring-emerald-400/30'
+              : 'text-amber-300 bg-amber-500/10 ring-amber-400/30'
           }`}
         >
           {hasLocation ? '설정됨' : '미설정'}
         </span>
       </div>
 
-      {/* 현재 좌표 */}
-      <div className="bg-gray-50 rounded-xl px-3 py-2.5 mb-3 text-xs">
+      <div className="rounded-xl bg-white/5 ring-1 ring-white/5 px-3 py-2.5 mb-3 text-xs">
         {hasLocation ? (
-          <p className="text-gray-600 font-mono">
+          <p className="text-slate-300 font-mono">
             {info!.lat!.toFixed(6)}, {info!.lng!.toFixed(6)}
           </p>
         ) : (
-          <p className="text-gray-400">위치가 설정되지 않아 직원 출퇴근 확인이 불가합니다.</p>
+          <p className="text-slate-500">
+            위치가 설정되지 않아 직원 출퇴근 확인이 불가합니다.
+          </p>
         )}
       </div>
 
-      {/* 현재 위치로 설정 */}
       <button
         onClick={handleSetCurrentLocation}
         disabled={saving}
-        className="w-full py-3 rounded-xl font-bold text-sm bg-blue-500 text-white active:scale-[0.98] hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all mb-3"
+        className="btn-primary w-full mb-3"
       >
         {saving ? '저장 중...' : '📡 현재 위치로 설정'}
       </button>
 
-      {/* 반경 설정 */}
       <div className="flex items-center gap-2">
-        <label className="text-xs text-gray-500 font-medium whitespace-nowrap">허용 반경</label>
+        <label className="text-xs text-slate-400 font-medium whitespace-nowrap">
+          허용 반경
+        </label>
         <input
           type="number"
           min={10}
@@ -154,13 +157,13 @@ export default function RestaurantLocationCard() {
           step={10}
           value={radiusInput}
           onChange={(e) => setRadiusInput(Number(e.target.value))}
-          className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+          className="input-field !py-2 !text-sm flex-1"
         />
-        <span className="text-xs text-gray-500">m</span>
+        <span className="text-xs text-slate-500">m</span>
         <button
           onClick={handleSaveRadius}
           disabled={saving || radiusInput === info?.gpsRadius}
-          className="px-3 py-2 text-xs font-bold bg-gray-100 text-gray-700 rounded-lg active:scale-95 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-ghost !px-3 !py-2 !text-xs disabled:opacity-40"
         >
           저장
         </button>
@@ -169,7 +172,7 @@ export default function RestaurantLocationCard() {
       {message && (
         <p
           className={`mt-2 text-xs text-center ${
-            message.type === 'success' ? 'text-green-600' : 'text-red-500'
+            message.type === 'success' ? 'text-emerald-300' : 'text-rose-300'
           }`}
         >
           {message.text}

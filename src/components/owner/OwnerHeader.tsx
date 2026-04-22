@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { signOut, useSession } from 'next-auth/react'
 
 export default function OwnerHeader() {
@@ -13,24 +14,32 @@ export default function OwnerHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-base">🍽️</span>
-          <span className="text-sm font-bold text-gray-800">
-            {session?.user?.name ?? '사장'}님
-          </span>
+    <header className="sticky top-0 z-40 border-b border-white/5 bg-[rgba(7,9,14,0.72)] backdrop-blur-xl">
+      <div className="mx-auto max-w-md px-4 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="h-7 w-7 overflow-hidden rounded-lg ring-1 ring-white/10">
+            <Image
+              src="/icon-192.png"
+              alt="더찰칵"
+              width={28}
+              height={28}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span className="text-[11px] text-slate-500">사장</span>
+            <span className="text-sm font-semibold text-slate-100">
+              {session?.user?.name ?? '사장'}님
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Link
-            href="/home"
-            className="text-xs text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors font-medium"
-          >
-            👥 직원 화면
+        <div className="flex items-center gap-1.5">
+          <Link href="/home" className="btn-ghost !py-1.5 !px-2.5 text-[11px]">
+            직원 화면
           </Link>
           <button
             onClick={handleLogout}
-            className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            className="btn-ghost !py-1.5 !px-2.5 text-[11px]"
           >
             로그아웃
           </button>

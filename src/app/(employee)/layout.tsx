@@ -22,15 +22,16 @@ export default function EmployeeLayout({
   const isOwnerPreviewing = (session?.user as { role?: string } | undefined)?.role === 'OWNER'
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* 사장이 직원 화면 보고 있을 때 상단 띠 */}
+    <div className="flex flex-col min-h-screen">
       {isOwnerPreviewing && (
-        <div className="bg-blue-50 border-b border-blue-200">
-          <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
-            <span className="text-xs text-blue-700 font-medium">👁️ 사장님이 직원 화면을 보는 중</span>
+        <div className="border-b border-indigo-400/30 bg-indigo-500/10 backdrop-blur-xl">
+          <div className="mx-auto max-w-md px-4 py-2 flex items-center justify-between">
+            <span className="text-xs text-indigo-200 font-medium">
+              👁️ 사장님이 직원 화면을 보는 중
+            </span>
             <Link
               href="/dashboard"
-              className="text-xs text-blue-700 hover:text-blue-900 px-2 py-1 rounded font-semibold"
+              className="text-xs text-indigo-100 hover:text-white px-2 py-1 rounded font-semibold"
             >
               사장 화면으로 ←
             </Link>
@@ -38,11 +39,10 @@ export default function EmployeeLayout({
         </div>
       )}
 
-      {/* 상단 헤더 */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="text-lg font-bold text-gray-800">직원 메뉴</span>
-          <span className="text-xs text-gray-400">
+      <header className="sticky top-0 z-40 border-b border-white/5 bg-[rgba(7,9,14,0.72)] backdrop-blur-xl">
+        <div className="mx-auto max-w-md px-4 h-14 flex items-center justify-between">
+          <span className="text-base font-bold text-slate-100">직원 메뉴</span>
+          <span className="text-xs text-slate-500">
             {new Date().toLocaleDateString('ko-KR', {
               month: 'long',
               day: 'numeric',
@@ -52,33 +52,38 @@ export default function EmployeeLayout({
         </div>
       </header>
 
-      {/* 본문 */}
-      <main className="flex-1 max-w-md mx-auto w-full pb-20">
-        {children}
-      </main>
+      <main className="flex-1 mx-auto w-full max-w-md pb-24">{children}</main>
 
-      {/* 하단 탭바 */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
-        <div className="max-w-md mx-auto flex">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-[rgba(7,9,14,0.72)] backdrop-blur-xl">
+        <div className="mx-auto max-w-md flex pb-[env(safe-area-inset-bottom)]">
           {tabs.map((tab) => {
-            const isActive = pathname === tab.href || pathname.startsWith(tab.href + '/')
+            const isActive =
+              pathname === tab.href || pathname.startsWith(tab.href + '/')
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
-                  isActive
-                    ? 'text-blue-600'
-                    : 'text-gray-400 hover:text-gray-600'
-                }`}
+                className="group relative flex-1 flex flex-col items-center justify-center py-2 gap-0.5"
               >
-                <span className="text-xl leading-none">{tab.icon}</span>
-                <span className={`text-[10px] font-medium ${isActive ? 'text-blue-600' : ''}`}>
+                {isActive && (
+                  <span className="absolute -top-px left-1/2 h-0.5 w-10 -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-indigo-400" />
+                )}
+                <span
+                  className={`text-xl leading-none transition-transform ${
+                    isActive ? 'scale-110' : 'opacity-70 group-hover:opacity-100'
+                  }`}
+                >
+                  {tab.icon}
+                </span>
+                <span
+                  className={`text-[10px] font-medium ${
+                    isActive
+                      ? 'text-slate-100'
+                      : 'text-slate-500 group-hover:text-slate-300'
+                  }`}
+                >
                   {tab.label}
                 </span>
-                {isActive && (
-                  <span className="absolute bottom-0 w-10 h-0.5 bg-blue-600 rounded-t-full" />
-                )}
               </Link>
             )
           })}

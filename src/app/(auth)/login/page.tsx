@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -39,79 +40,103 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center px-4">
-      <div className="max-w-md mx-auto w-full">
-        {/* 로고 / 앱 이름 */}
-        <div className="text-center mb-10">
-          <div className="text-5xl mb-3">🍽️</div>
-          <h1 className="text-3xl font-bold text-gray-900">식당 관리</h1>
-          <p className="mt-2 text-sm text-gray-500">사장님 전용 관리 시스템</p>
+    <div className="min-h-screen flex flex-col justify-center px-4 py-10">
+      <div className="mx-auto w-full max-w-md">
+        {/* Brand header */}
+        <div className="text-center mb-8">
+          <div className="mx-auto mb-4 h-20 w-20 rounded-2xl overflow-hidden shadow-[0_0_40px_rgba(99,102,241,0.35)] ring-1 ring-white/10">
+            <Image
+              src="/icon-512.png"
+              alt="더찰칵"
+              width={80}
+              height={80}
+              className="h-full w-full object-cover"
+              priority
+            />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-indigo-200 via-white to-indigo-200 bg-clip-text text-transparent">
+            더찰칵
+          </h1>
+          <p className="mt-2 text-sm text-slate-400">
+            찰칵 한 번에, 식당 관리 끝
+          </p>
         </div>
 
-        {/* 로그인 카드 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-6">로그인</h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 이메일 */}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                이메일
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@email.com"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition placeholder-gray-400"
-              />
+        {/* Login card */}
+        <div className="ai-border">
+          <div className="ai-border-inner p-6 sm:p-7">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-100">로그인</h2>
+              <span className="chip">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                Secure
+              </span>
             </div>
 
-            {/* 비밀번호 */}
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                비밀번호
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="비밀번호를 입력하세요"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition placeholder-gray-400"
-              />
-            </div>
-
-            {/* 에러 메시지 */}
-            {error && (
-              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-                <p className="text-sm text-red-600">{error}</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-xs font-medium text-slate-400 mb-1.5"
+                >
+                  이메일
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@email.com"
+                  className="input-field"
+                />
               </div>
-            )}
 
-            {/* 로그인 버튼 */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold py-3 rounded-xl text-sm transition-colors duration-200 mt-2"
-            >
-              {loading ? '로그인 중...' : '로그인'}
-            </button>
-          </form>
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-xs font-medium text-slate-400 mb-1.5"
+                >
+                  비밀번호
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="비밀번호를 입력하세요"
+                  className="input-field"
+                />
+              </div>
+
+              {error && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+                  <p className="text-sm text-red-300">{error}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full mt-2"
+              >
+                {loading ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    로그인 중...
+                  </>
+                ) : (
+                  '로그인'
+                )}
+              </button>
+            </form>
+          </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <p className="text-center text-xs text-slate-500 mt-6">
           관리자에게 계정 발급을 문의하세요
         </p>
       </div>

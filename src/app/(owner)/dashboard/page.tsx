@@ -31,9 +31,6 @@ interface DashboardSummary {
   todayAttendance: AttendanceRecord[]
 }
 
-// ──────────────────────────────────────────────
-// 유틸
-// ──────────────────────────────────────────────
 function formatKRW(amount: number) {
   return new Intl.NumberFormat('ko-KR').format(Math.round(amount)) + '원'
 }
@@ -59,39 +56,54 @@ function todayLabel() {
 // ──────────────────────────────────────────────
 // 서브 컴포넌트
 // ──────────────────────────────────────────────
+type Tone = 'blue' | 'rose' | 'emerald' | 'slate'
+const TONE: Record<Tone, { text: string; bg: string; ring: string }> = {
+  blue:    { text: 'text-sky-300',     bg: 'from-sky-500/15 to-sky-500/5',        ring: 'ring-sky-400/20' },
+  rose:    { text: 'text-rose-300',    bg: 'from-rose-500/15 to-rose-500/5',      ring: 'ring-rose-400/20' },
+  emerald: { text: 'text-emerald-300', bg: 'from-emerald-500/15 to-emerald-500/5', ring: 'ring-emerald-400/20' },
+  slate:   { text: 'text-slate-300',   bg: 'from-slate-500/15 to-slate-500/5',     ring: 'ring-slate-400/20' },
+}
+
 function SummaryCard({
   label,
   value,
-  color,
+  tone,
   loading,
   href,
 }: {
   label: string
   value: number
-  color: string
+  tone: Tone
   loading: boolean
   href?: string
 }) {
+  const t = TONE[tone]
   const content = (
-    <div className={`rounded-2xl p-4 ${color} ${href ? 'active:opacity-80 cursor-pointer' : ''}`}>
-      <p className="text-xs font-medium text-white/80 mb-1">{label}</p>
+    <div
+      className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${t.bg} ring-1 ${t.ring} p-3 transition ${
+        href ? 'active:scale-[0.98] cursor-pointer hover:ring-2' : ''
+      }`}
+    >
+      <p className="text-[11px] font-medium text-slate-400 mb-1">{label}</p>
       {loading ? (
-        <div className="h-7 w-24 bg-white/30 rounded-lg animate-pulse" />
+        <div className="h-6 w-20 bg-white/10 rounded animate-pulse" />
       ) : (
-        <p className="text-xl font-bold text-white">{formatKRW(value)}</p>
+        <p className={`text-lg font-bold tabular-nums ${t.text}`}>
+          {formatKRW(value)}
+        </p>
       )}
-      {href && <p className="text-[10px] text-white/60 mt-1">상세보기 &gt;</p>}
+      {href && (
+        <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-0.5">
+          상세보기
+          <span className="transition-transform group-hover:translate-x-0.5">›</span>
+        </p>
+      )}
     </div>
   )
-  if (href) {
-    return <Link href={href}>{content}</Link>
-  }
+  if (href) return <Link href={href}>{content}</Link>
   return content
 }
 
-// ──────────────────────────────────────────────
-// 메인 페이지
-// ──────────────────────────────────────────────
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardSummary | null>(null)
   const [pendingOrderCount, setPendingOrderCount] = useState<number>(0)
@@ -118,7 +130,6 @@ export default function DashboardPage() {
       }
     }
 
-    // summary에 없으면 별도 fetch (PENDING 발주 개수)
     const fetchPendingOrders = async () => {
       try {
         const res = await fetch('/api/orders?status=PENDING')
@@ -137,32 +148,57 @@ export default function DashboardPage() {
   }, [])
 
   return (
-    <div className="px-4 pt-6 pb-4 space-y-5">
+    <div className="px-4 pt-5 pb-6 space-y-5">
       {/* 날짜 헤더 */}
-      <div>
-        <p className="text-xs text-gray-400 font-medium">오늘</p>
-        <h1 className="text-xl font-bold text-gray-900">{todayLabel()}</h1>
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+            Today
+          </p>
+          <h1 className="text-xl font-bold text-slate-100 mt-0.5">
+            {todayLabel()}
+          </h1>
+        </div>
+        <span className="chip">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          Live
+        </span>
       </div>
 
       {/* 에러 배너 */}
       {error && (
-        <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3">
+          <p className="text-sm text-rose-300">{error}</p>
         </div>
       )}
 
-      {/* 빠른 지출 등록 (영수증 촬영) */}
+      {/* 영수증 촬영 CTA */}
       <Link
         href="/finance/expenses/receipt"
-        className="flex items-center gap-4 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl px-5 py-4 shadow-sm transition-colors"
+        className="relative flex items-center gap-4 overflow-hidden rounded-2xl px-5 py-4 shadow-[0_8px_28px_rgba(99,102,241,0.35)] ring-1 ring-indigo-400/30 transition active:scale-[0.99]"
+        style={{
+          background:
+            'linear-gradient(135deg, #4f46e5 0%, #7c3aed 60%, #c026d3 120%)',
+        }}
       >
-        <span className="text-3xl">📸</span>
-        <div>
-          <p className="font-bold text-base">영수증 촬영</p>
-          <p className="text-xs text-white/80">사진으로 지출 등록 + 재고 입고</p>
+        <span className="absolute inset-0 opacity-30 mix-blend-overlay pointer-events-none bg-[radial-gradient(circle_at_20%_30%,rgba(255,255,255,0.6),transparent_40%)]" />
+        <span className="relative text-3xl drop-shadow">📸</span>
+        <div className="relative">
+          <p className="font-bold text-base text-white">영수증 촬영</p>
+          <p className="text-xs text-white/80">사진 한 장으로 지출 등록 + 재고 입고</p>
         </div>
-        <svg className="w-5 h-5 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        <svg
+          className="relative w-5 h-5 ml-auto text-white/80"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
         </svg>
       </Link>
 
@@ -171,112 +207,112 @@ export default function DashboardPage() {
         <PendingOrdersCard count={pendingOrderCount} />
       )}
 
-      {/* 안전재고 이하 알림 배너 */}
+      {/* 안전재고 이하 알림 */}
       {!loading && data && data.lowStockCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+        <div className="flex items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
           <span className="text-xl">⚠️</span>
           <div>
-            <p className="text-sm font-semibold text-amber-800">
+            <p className="text-sm font-semibold text-amber-200">
               발주 필요 품목 {data.lowStockCount}개
             </p>
-            <p className="text-xs text-amber-600 mt-0.5">
+            <p className="text-xs text-amber-300/80 mt-0.5">
               안전재고 이하인 품목을 확인해주세요
             </p>
           </div>
         </div>
       )}
 
-      {/* 오늘 매출/지출/순이익 카드 */}
+      {/* 오늘 손익 */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-500 mb-3">오늘 손익</h2>
+        <h2 className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-2.5">
+          오늘 손익
+        </h2>
         <div className="grid grid-cols-3 gap-2">
           <SummaryCard
             label="매출"
             value={data?.today.sales ?? 0}
-            color="bg-blue-500"
+            tone="blue"
             loading={loading}
             href="/finance/daily"
           />
           <SummaryCard
             label="지출"
             value={data?.today.expenses ?? 0}
-            color="bg-rose-500"
+            tone="rose"
             loading={loading}
             href="/finance/daily"
           />
           <SummaryCard
             label="순이익"
             value={data?.today.netProfit ?? 0}
-            color={
-              (data?.today.netProfit ?? 0) >= 0
-                ? 'bg-emerald-500'
-                : 'bg-gray-500'
-            }
+            tone={(data?.today.netProfit ?? 0) >= 0 ? 'emerald' : 'slate'}
             loading={loading}
           />
         </div>
       </section>
 
-      {/* 이번 달 누적 손익 */}
+      {/* 이번 달 누적 */}
       <Link href="/finance/monthly" className="block">
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm active:bg-gray-50 cursor-pointer">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-sm font-semibold text-gray-700">이번 달 누적</h2>
-          <span className="text-xs text-gray-400">상세보기 &gt;</span>
-        </div>
-        {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-5 bg-gray-100 rounded animate-pulse" />
-            ))}
+        <section className="glass-card p-4 active:scale-[0.99] transition">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
+              이번 달 누적
+            </h2>
+            <span className="text-[11px] text-slate-500">상세 ›</span>
           </div>
-        ) : (
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500">누적 매출</span>
-              <span className="font-semibold text-blue-600">
-                {formatKRW(data?.monthly.sales ?? 0)}
-              </span>
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-5 bg-white/5 rounded animate-pulse" />
+              ))}
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500">누적 지출</span>
-              <span className="font-semibold text-rose-600">
-                {formatKRW(data?.monthly.expenses ?? 0)}
-              </span>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">누적 매출</span>
+                <span className="font-semibold text-sky-300 tabular-nums">
+                  {formatKRW(data?.monthly.sales ?? 0)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">누적 지출</span>
+                <span className="font-semibold text-rose-300 tabular-nums">
+                  {formatKRW(data?.monthly.expenses ?? 0)}
+                </span>
+              </div>
+              <div className="border-t border-white/5 pt-2.5 flex justify-between items-center">
+                <span className="text-slate-200 font-medium">누적 순이익</span>
+                <span
+                  className={`font-bold text-base tabular-nums ${
+                    (data?.monthly.netProfit ?? 0) >= 0
+                      ? 'text-emerald-300'
+                      : 'text-rose-300'
+                  }`}
+                >
+                  {formatKRW(data?.monthly.netProfit ?? 0)}
+                </span>
+              </div>
             </div>
-            <div className="border-t border-gray-100 pt-2 flex justify-between items-center">
-              <span className="text-gray-700 font-medium">누적 순이익</span>
-              <span
-                className={`font-bold text-base ${
-                  (data?.monthly.netProfit ?? 0) >= 0
-                    ? 'text-emerald-600'
-                    : 'text-rose-600'
-                }`}
-              >
-                {formatKRW(data?.monthly.netProfit ?? 0)}
-              </span>
-            </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
       </Link>
 
       {/* 식당 위치 설정 */}
       <RestaurantLocationCard />
 
-      {/* 직원 출퇴근 현황 */}
-      <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+      {/* 출퇴근 현황 */}
+      <section className="glass-card p-4">
+        <h2 className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-3">
           오늘 출퇴근 현황
         </h2>
         {loading ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {[1, 2].map((i) => (
-              <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+              <div key={i} className="h-11 bg-white/5 rounded-xl animate-pulse" />
             ))}
           </div>
         ) : !data || data.todayAttendance.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">
+          <p className="text-sm text-slate-500 text-center py-4">
             오늘 출근 기록이 없습니다
           </p>
         ) : (
@@ -284,23 +320,23 @@ export default function DashboardPage() {
             {data.todayAttendance.map((record) => (
               <li
                 key={record.userId}
-                className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5"
+                className="flex items-center justify-between rounded-xl bg-white/5 ring-1 ring-white/5 px-3 py-2.5"
               >
                 <div className="flex items-center gap-2">
                   <span className="text-base">
                     {record.clockOut ? '✅' : '🟢'}
                   </span>
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-sm font-medium text-slate-100">
                     {record.name}
                   </span>
                 </div>
-                <div className="text-right text-xs text-gray-500">
+                <div className="text-right text-[11px] text-slate-400">
                   <span>출근 {formatTime(record.clockIn)}</span>
                   {record.clockOut && (
                     <span className="ml-2">퇴근 {formatTime(record.clockOut)}</span>
                   )}
                   {!record.clockOut && record.clockIn && (
-                    <span className="ml-2 text-emerald-600 font-medium">근무 중</span>
+                    <span className="ml-2 text-emerald-300 font-medium">근무 중</span>
                   )}
                 </div>
               </li>
