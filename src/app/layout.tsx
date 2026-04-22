@@ -15,13 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "더찰칵",
-  description: "더찰칵 - 식당 관리 시스템",
-  applicationName: "더찰칵",
+  title: "오토드림",
+  description: "오토드림 - 자동화로 편해지는 식당 운영 관리",
+  applicationName: "오토드림",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "더찰칵",
+    title: "오토드림",
   },
   formatDetection: {
     telephone: false,

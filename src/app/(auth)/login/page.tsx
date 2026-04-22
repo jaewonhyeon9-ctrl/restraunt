@@ -47,7 +47,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 h-20 w-20 rounded-2xl overflow-hidden shadow-[0_0_40px_rgba(99,102,241,0.35)] ring-1 ring-white/10">
             <Image
               src="/icon-512.png"
-              alt="더찰칵"
+              alt="오토드림"
               width={80}
               height={80}
               className="h-full w-full object-cover"
@@ -55,10 +55,10 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-indigo-200 via-white to-indigo-200 bg-clip-text text-transparent">
-            더찰칵
+            오토드림
           </h1>
           <p className="mt-2 text-sm text-slate-400">
-            찰칵 한 번에, 식당 관리 끝
+            꿈꾸던 식당 운영, 오토드림이 해드립니다
           </p>
         </div>
 

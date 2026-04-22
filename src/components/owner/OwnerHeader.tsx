@@ -20,7 +20,7 @@ export default function OwnerHeader() {
           <div className="h-7 w-7 overflow-hidden rounded-lg ring-1 ring-white/10">
             <Image
               src="/icon-192.png"
-              alt="더찰칵"
+              alt="오토드림"
               width={28}
               height={28}
               className="h-full w-full object-cover"

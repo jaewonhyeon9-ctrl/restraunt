@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "개인정보처리방침 | 더찰칵",
-  description: "더찰칵 앱의 개인정보처리방침",
+  title: "개인정보처리방침 | 오토드림",
+  description: "오토드림 앱의 개인정보처리방침",
 };
 
 export const dynamic = "force-static";
@@ -17,7 +17,7 @@ export default function PrivacyPolicyPage() {
       <p className="mt-2 text-sm text-slate-500">시행일: {EFFECTIVE_DATE}</p>
 
       <p className="mt-6 leading-relaxed">
-        더찰칵(이하 &ldquo;서비스&rdquo;)은 식당 운영에 필요한 주문, 재고, 근태, 매출,
+        오토드림(이하 &ldquo;서비스&rdquo;)은 식당 운영에 필요한 주문, 재고, 근태, 매출,
         지출 관리를 위한 웹 및 모바일 애플리케이션입니다. 본 방침은 서비스가 수집하는
         개인정보의 종류, 이용 목적, 보관 기간, 제3자 제공, 이용자의 권리 등에 대해
         설명합니다.
