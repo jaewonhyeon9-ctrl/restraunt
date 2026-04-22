@@ -30,6 +30,7 @@ model Restaurant {
   attendance       Attendance[]
   checklistLogs    ChecklistLog[]
   inventoryLogs    InventoryLog[]
+  dailyNotes       DailyNote[]
 }
 
 // 사용자 (사장 + 직원)
@@ -57,6 +58,7 @@ model User {
   sales            Sale[]
   inventoryLogs    InventoryLog[]
   notifications    Notification[]
+  dailyNotes       DailyNote[]
 }
 
 enum Role {
@@ -87,17 +89,24 @@ model Attendance {
   @@unique([userId, date])
 }
 
+// 체크리스트 카테고리 (주방/서빙)
+enum ChecklistCategory {
+  KITCHEN
+  HALL
+}
+
 // 체크리스트 템플릿
 model ChecklistTemplate {
-  id           String   @id @default(cuid())
+  id           String            @id @default(cuid())
   restaurantId String
   title        String
   description  String?
-  assignedRole Role     @default(EMPLOYEE)
+  assignedRole Role              @default(EMPLOYEE)
+  category     ChecklistCategory @default(HALL)
   timeSlot     String?
-  sortOrder    Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  sortOrder    Int               @default(0)
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
 
   restaurant    Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   checklistLogs ChecklistLog[]
@@ -120,6 +129,31 @@ model ChecklistLog {
   restaurant Restaurant        @relation(fields: [restaurantId], references: [id])
 
   @@unique([templateId, userId, date])
+}
+
+// 일일 메모 타입 (교대 전달/특이사항/사장 전달/컴플레인)
+enum DailyNoteType {
+  HANDOVER     // 다음 타임 전달사항
+  ANOMALY      // 특이사항
+  OWNER_NOTE   // 사장님께 전달사항
+  COMPLAINT    // 고객 컴플레인
+}
+
+// 일일 메모 (체크리스트 하단 입력 항목)
+model DailyNote {
+  id           String        @id @default(cuid())
+  restaurantId String
+  userId       String
+  date         DateTime      @db.Date
+  type         DailyNoteType
+  category     ChecklistCategory?
+  content      String
+  createdAt    DateTime      @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@index([restaurantId, date])
 }
 
 // 거래처

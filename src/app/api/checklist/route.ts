@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { ChecklistCategory } from '@prisma/client'
+
+const VALID_CATEGORY = new Set(['KITCHEN', 'HALL'])
 
 // GET: 오늘 체크리스트 목록 (템플릿 + 완료 여부)
-export async function GET() {
+// query: ?category=KITCHEN|HALL (optional)
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
@@ -18,12 +22,21 @@ export async function GET() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  const { searchParams } = new URL(req.url)
+  const category = searchParams.get('category')
+
+  const where: {
+    restaurantId: string
+    isActive: boolean
+    category?: ChecklistCategory
+  } = { restaurantId, isActive: true }
+  if (category && VALID_CATEGORY.has(category)) {
+    where.category = category as ChecklistCategory
+  }
+
   // 활성 템플릿 조회
   const templates = await prisma.checklistTemplate.findMany({
-    where: {
-      restaurantId,
-      isActive: true,
-    },
+    where,
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   })
 
@@ -49,6 +62,7 @@ export async function GET() {
       templateId: template.id,
       title: template.title,
       description: template.description,
+      category: template.category,
       timeSlot: template.timeSlot,
       sortOrder: template.sortOrder,
       isChecked: log?.isChecked ?? false,

@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 // 사장 전용 경로
-const OWNER_ONLY = ['/dashboard', '/finance', '/suppliers', '/employees']
+const OWNER_ONLY = ['/dashboard', '/finance', '/suppliers', '/employees', '/checklist-admin']
 // 직원 전용 경로
 const EMPLOYEE_ONLY = ['/home', '/checklist', '/profile', '/inventory/check', '/inventory/order']
 

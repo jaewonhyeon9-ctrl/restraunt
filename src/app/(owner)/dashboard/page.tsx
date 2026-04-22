@@ -297,6 +297,21 @@ export default function DashboardPage() {
         </section>
       </Link>
 
+      {/* 체크리스트 관리 */}
+      <Link
+        href="/checklist-admin"
+        className="flex items-center gap-3 rounded-2xl glass-card p-4 transition active:scale-[0.99]"
+      >
+        <span className="text-2xl">📋</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-100">체크리스트 관리</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            주방·서빙 체크리스트 등록 / 엑셀 업로드
+          </p>
+        </div>
+        <span className="text-slate-500">›</span>
+      </Link>
+
       {/* 식당 위치 설정 */}
       <RestaurantLocationCard />
 
