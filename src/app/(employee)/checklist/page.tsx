@@ -11,6 +11,7 @@ interface ChecklistItem {
   description: string | null
   category: Category
   timeSlot: string | null
+  scheduledTime: string | null
   sortOrder: number
   isChecked: boolean
   checkedAt: string | null
@@ -112,7 +113,15 @@ export default function ChecklistPage() {
     const sorted = Array.from(map.entries()).sort(
       ([a], [b]) => slotPriority(a) - slotPriority(b)
     )
-    sorted.forEach(([, list]) => list.sort((a, b) => a.sortOrder - b.sortOrder))
+    sorted.forEach(([, list]) =>
+      list.sort((a, b) => {
+        // time-aware ordering: scheduledTime first (asc), then sortOrder
+        const ta = a.scheduledTime ?? '99:99'
+        const tb = b.scheduledTime ?? '99:99'
+        if (ta !== tb) return ta.localeCompare(tb)
+        return a.sortOrder - b.sortOrder
+      })
+    )
     return sorted
   }, [categoryItems])
 
@@ -222,7 +231,14 @@ export default function ChecklistPage() {
                 </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="relative space-y-2">
+                {/* Timeline vertical line */}
+                {slotItems.some((i) => i.scheduledTime) && (
+                  <div
+                    aria-hidden
+                    className="absolute left-[42px] top-2 bottom-2 w-px bg-gradient-to-b from-indigo-400/30 via-indigo-400/20 to-transparent"
+                  />
+                )}
                 {slotItems.map((item) => {
                   const isProcessing = checking.has(item.templateId)
                   return (
@@ -232,35 +248,49 @@ export default function ChecklistPage() {
                         handleCheck(item.templateId, item.isChecked)
                       }
                       disabled={isProcessing}
-                      className={`w-full text-left rounded-xl p-3.5 ring-1 transition active:scale-[0.99] ${
+                      className={`relative w-full text-left rounded-xl p-3.5 ring-1 transition active:scale-[0.99] ${
                         item.isChecked
                           ? 'bg-emerald-500/10 ring-emerald-400/30'
                           : 'bg-white/5 ring-white/10 hover:ring-white/20'
                       } ${isProcessing ? 'opacity-60' : ''}`}
                     >
                       <div className="flex items-start gap-3">
-                        <div
-                          className={`mt-0.5 flex-shrink-0 h-5 w-5 rounded-md flex items-center justify-center transition ${
-                            item.isChecked
-                              ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 ring-1 ring-emerald-300'
-                              : 'bg-white/5 ring-1 ring-white/20'
-                          }`}
-                        >
-                          {item.isChecked && (
-                            <svg
-                              className="w-3 h-3 text-white"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={3}
+                        {/* Time badge or checkbox column */}
+                        <div className="flex flex-col items-center gap-1 min-w-[38px]">
+                          {item.scheduledTime && (
+                            <span
+                              className={`text-[11px] font-mono font-bold tabular-nums leading-none ${
+                                item.isChecked
+                                  ? 'text-emerald-300/70'
+                                  : 'text-amber-300'
+                              }`}
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
+                              {item.scheduledTime}
+                            </span>
                           )}
+                          <div
+                            className={`flex-shrink-0 h-5 w-5 rounded-md flex items-center justify-center transition ${
+                              item.isChecked
+                                ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 ring-1 ring-emerald-300'
+                                : 'bg-white/5 ring-1 ring-white/20'
+                            }`}
+                          >
+                            {item.isChecked && (
+                              <svg
+                                className="w-3 h-3 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={3}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex-1 min-w-0">

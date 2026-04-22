@@ -10,9 +10,10 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
--- 2. ChecklistTemplate 테이블에 category 컬럼 추가 (기본값 HALL)
+-- 2. ChecklistTemplate 테이블에 category, scheduledTime 컬럼 추가
 ALTER TABLE "ChecklistTemplate"
-  ADD COLUMN IF NOT EXISTS "category" "ChecklistCategory" NOT NULL DEFAULT 'HALL';
+  ADD COLUMN IF NOT EXISTS "category" "ChecklistCategory" NOT NULL DEFAULT 'HALL',
+  ADD COLUMN IF NOT EXISTS "scheduledTime" TEXT;
 
 -- 3. DailyNoteType enum
 DO $$ BEGIN
@@ -61,5 +62,6 @@ COMMIT;
 -- 롤백 SQL (문제 발생 시):
 -- DROP TABLE IF EXISTS "DailyNote";
 -- DROP TYPE IF EXISTS "DailyNoteType";
+-- ALTER TABLE "ChecklistTemplate" DROP COLUMN IF EXISTS "scheduledTime";
 -- ALTER TABLE "ChecklistTemplate" DROP COLUMN IF EXISTS "category";
 -- DROP TYPE IF EXISTS "ChecklistCategory";

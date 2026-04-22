@@ -10,6 +10,7 @@ interface Template {
   description: string | null
   category: Category
   timeSlot: string | null
+  scheduledTime: string | null
   sortOrder: number
   isActive: boolean
 }
@@ -30,7 +31,8 @@ export default function ChecklistAdminPage() {
     title: string
     description: string
     timeSlot: string
-  }>({ title: '', description: '', timeSlot: '오픈 전' })
+    scheduledTime: string
+  }>({ title: '', description: '', timeSlot: '오픈 전', scheduledTime: '' })
   const [submitting, setSubmitting] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -73,6 +75,7 @@ export default function ChecklistAdminPage() {
           description: form.description,
           category: activeCategory,
           timeSlot: form.timeSlot,
+          scheduledTime: form.scheduledTime || null,
         }),
       })
       const json = await res.json()
@@ -80,7 +83,7 @@ export default function ChecklistAdminPage() {
         flash('error', json.error ?? '등록 실패')
       } else {
         flash('success', '항목이 추가되었습니다.')
-        setForm({ ...form, title: '', description: '' })
+        setForm({ ...form, title: '', description: '', scheduledTime: '' })
         fetchItems()
       }
     } finally {
@@ -223,31 +226,49 @@ export default function ChecklistAdminPage() {
               </h2>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">
-                시간대
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {PRESET_SLOTS.map((s) => (
-                  <button
-                    type="button"
-                    key={s}
-                    onClick={() => setForm({ ...form, timeSlot: s })}
-                    className={`px-2.5 py-1 text-xs rounded-lg transition ${
-                      form.timeSlot === s
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-white/5 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  시간대 (라벨)
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {PRESET_SLOTS.map((s) => (
+                    <button
+                      type="button"
+                      key={s}
+                      onClick={() => setForm({ ...form, timeSlot: s })}
+                      className={`px-2 py-1 text-[11px] rounded-lg transition ${
+                        form.timeSlot === s
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-white/5 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
                 <input
                   value={form.timeSlot}
                   onChange={(e) => setForm({ ...form, timeSlot: e.target.value })}
                   placeholder="직접 입력"
-                  className="input-field !py-1 !px-2 !text-xs w-28"
+                  className="input-field !py-1.5 !px-2 !text-xs mt-1.5 w-full"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  ⏰ 시간 (선택)
+                </label>
+                <input
+                  type="time"
+                  value={form.scheduledTime}
+                  onChange={(e) =>
+                    setForm({ ...form, scheduledTime: e.target.value })
+                  }
+                  className="input-field !text-sm w-full"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  시간 지정 시 타임라인 순서대로 표시됨
+                </p>
               </div>
             </div>
 
@@ -399,7 +420,12 @@ export default function ChecklistAdminPage() {
                         className="flex items-start justify-between gap-2 rounded-lg bg-white/5 ring-1 ring-white/5 px-3 py-2"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {t.scheduledTime && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 font-mono font-semibold tabular-nums">
+                                {t.scheduledTime}
+                              </span>
+                            )}
                             {t.timeSlot && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 font-medium">
                                 {t.timeSlot}

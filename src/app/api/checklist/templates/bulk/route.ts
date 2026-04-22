@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { ChecklistCategory } from '@prisma/client'
 import * as XLSX from 'xlsx'
+import { normalizeTime } from '../route'
 
 async function requireOwner() {
   const session = await auth()
@@ -89,6 +90,13 @@ export async function POST(req: NextRequest) {
       row['TimeSlot'] ??
       row['time_slot'] ??
       null,
+    scheduledTime:
+      row['시간'] ??
+      row['예정시간'] ??
+      row['time'] ??
+      row['Time'] ??
+      row['scheduledTime'] ??
+      null,
     title:
       row['제목'] ?? row['항목'] ?? row['title'] ?? row['Title'] ?? row['TITLE'],
     description:
@@ -99,6 +107,7 @@ export async function POST(req: NextRequest) {
   type ParsedRow = {
     category: ChecklistCategory
     timeSlot: string | null
+    scheduledTime: string | null
     title: string
     description: string | null
     sortOrder: number
@@ -128,6 +137,9 @@ export async function POST(req: NextRequest) {
     parsed.push({
       category,
       timeSlot: normalizeTimeSlot(mapped.timeSlot),
+      scheduledTime: mapped.scheduledTime
+        ? normalizeTime(String(mapped.scheduledTime))
+        : null,
       title,
       description: mapped.description
         ? String(mapped.description).trim() || null
@@ -162,6 +174,7 @@ export async function POST(req: NextRequest) {
         description: p.description,
         category: p.category,
         timeSlot: p.timeSlot,
+        scheduledTime: p.scheduledTime,
         sortOrder: p.sortOrder,
       })),
     })

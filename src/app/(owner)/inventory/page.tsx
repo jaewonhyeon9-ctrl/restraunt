@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import InventoryExcelUpload from '@/components/owner/InventoryExcelUpload'
 
 interface Supplier {
   id: string
@@ -44,6 +45,7 @@ export default function OwnerInventoryPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [showExcelModal, setShowExcelModal] = useState(false)
   const [form, setForm] = useState<AddItemForm>(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -116,22 +118,38 @@ export default function OwnerInventoryPage() {
     <div className="px-4 py-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-900">재고 현황</h1>
+        <h1 className="text-xl font-bold text-slate-100">재고 현황</h1>
         <div className="flex gap-2">
           <Link
             href="/owner/inventory/orders"
-            className="text-sm px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 font-medium"
+            className="btn-ghost !py-1.5 !px-3 !text-xs"
           >
             발주내역
           </Link>
           <button
-            onClick={() => setShowModal(true)}
-            className="text-sm px-3 py-1.5 rounded-lg bg-orange-500 text-white font-medium"
+            onClick={() => setShowExcelModal(true)}
+            className="btn-ghost !py-1.5 !px-3 !text-xs"
           >
-            + 품목 추가
+            📥 엑셀
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="btn-primary !py-1.5 !px-3 !text-xs"
+          >
+            + 품목
           </button>
         </div>
       </div>
+
+      {showExcelModal && (
+        <InventoryExcelUpload
+          onClose={() => setShowExcelModal(false)}
+          onDone={() => {
+            setShowExcelModal(false)
+            fetchItems()
+          }}
+        />
+      )}
 
       {/* 안전재고 이하 경고 배너 */}
       {lowStockItems.length > 0 && (

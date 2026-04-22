@@ -34,10 +34,14 @@ export async function GET(req: NextRequest) {
     where.category = category as ChecklistCategory
   }
 
-  // 활성 템플릿 조회
+  // 활성 템플릿 조회 (시간이 있는 것은 시간순, 없는 건 sortOrder)
   const templates = await prisma.checklistTemplate.findMany({
     where,
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    orderBy: [
+      { scheduledTime: { sort: 'asc', nulls: 'last' } },
+      { sortOrder: 'asc' },
+      { createdAt: 'asc' },
+    ],
   })
 
   if (templates.length === 0) {
@@ -64,6 +68,7 @@ export async function GET(req: NextRequest) {
       description: template.description,
       category: template.category,
       timeSlot: template.timeSlot,
+      scheduledTime: template.scheduledTime,
       sortOrder: template.sortOrder,
       isChecked: log?.isChecked ?? false,
       checkedAt: log?.checkedAt?.toISOString() ?? null,

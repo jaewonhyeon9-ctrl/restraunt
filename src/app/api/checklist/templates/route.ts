@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     description?: string | null
     category?: string
     timeSlot?: string | null
+    scheduledTime?: string | null
     sortOrder?: number
   }
   try {
@@ -83,6 +84,14 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const scheduledTime = normalizeTime(body.scheduledTime ?? null)
+  if (body.scheduledTime && !scheduledTime) {
+    return NextResponse.json(
+      { error: '시간은 HH:mm 형식이어야 합니다. (예: 09:30)' },
+      { status: 400 }
+    )
+  }
+
   const template = await prisma.checklistTemplate.create({
     data: {
       restaurantId: ctx.restaurantId,
@@ -90,9 +99,35 @@ export async function POST(req: NextRequest) {
       description: body.description?.trim() || null,
       category: category as ChecklistCategory,
       timeSlot: body.timeSlot?.trim() || null,
+      scheduledTime,
       sortOrder: body.sortOrder ?? 0,
     },
   })
 
   return NextResponse.json(template, { status: 201 })
+}
+
+// HH:mm normalize (accepts "9:30", "09:30", "0930", "9시30분")
+export function normalizeTime(raw: string | null): string | null {
+  if (!raw) return null
+  const s = String(raw).trim()
+  if (!s) return null
+
+  const patterns: RegExp[] = [
+    /^(\d{1,2}):(\d{2})$/,
+    /^(\d{1,2})시\s*(\d{1,2})분?$/,
+    /^(\d{1,2})시$/,
+    /^(\d{2})(\d{2})$/,
+  ]
+  for (const re of patterns) {
+    const m = s.match(re)
+    if (m) {
+      const h = Number(m[1])
+      const mi = m[2] ? Number(m[2]) : 0
+      if (h >= 0 && h < 24 && mi >= 0 && mi < 60) {
+        return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`
+      }
+    }
+  }
+  return null
 }

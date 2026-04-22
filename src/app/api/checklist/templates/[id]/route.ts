@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { ChecklistCategory } from '@prisma/client'
+import { normalizeTime } from '../route'
 
 const VALID_CATEGORY = new Set(['KITCHEN', 'HALL'])
 
@@ -34,6 +35,7 @@ export async function PATCH(
     description?: string | null
     category?: string
     timeSlot?: string | null
+    scheduledTime?: string | null
     sortOrder?: number
     isActive?: boolean
   }
@@ -58,6 +60,7 @@ export async function PATCH(
     description?: string | null
     category?: ChecklistCategory
     timeSlot?: string | null
+    scheduledTime?: string | null
     sortOrder?: number
     isActive?: boolean
   } = {}
@@ -83,6 +86,16 @@ export async function PATCH(
   }
   if (body.timeSlot !== undefined) {
     data.timeSlot = body.timeSlot?.trim() || null
+  }
+  if (body.scheduledTime !== undefined) {
+    const t = normalizeTime(body.scheduledTime ?? null)
+    if (body.scheduledTime && !t) {
+      return NextResponse.json(
+        { error: '시간은 HH:mm 형식이어야 합니다.' },
+        { status: 400 }
+      )
+    }
+    data.scheduledTime = t
   }
   if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder
   if (body.isActive !== undefined) data.isActive = body.isActive
