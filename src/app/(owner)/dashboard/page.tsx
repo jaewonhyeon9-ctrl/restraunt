@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import RestaurantLocationCard from '@/components/owner/RestaurantLocationCard'
 import PendingOrdersCard from '@/components/owner/PendingOrdersCard'
+import EmployeePerformanceCard from '@/components/owner/EmployeePerformanceCard'
 
 // ──────────────────────────────────────────────
 // 타입 정의
@@ -296,6 +297,9 @@ export default function DashboardPage() {
           )}
         </section>
       </Link>
+
+      {/* 직원 업무 성과율 */}
+      <EmployeePerformanceCard />
 
       {/* 체크리스트 관리 */}
       <Link
