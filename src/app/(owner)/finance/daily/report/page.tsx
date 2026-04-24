@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const NOTE_LABEL: Record<string, { label: string; icon: string; color: string }> = {
@@ -164,6 +164,21 @@ function buildShareText(data: ReportData) {
 }
 
 export default function DailyReportPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="px-4 py-8 space-y-3">
+          <div className="h-8 w-44 bg-white/5 rounded animate-pulse" />
+          <div className="h-32 bg-white/5 rounded-2xl animate-pulse" />
+        </div>
+      }
+    >
+      <DailyReportInner />
+    </Suspense>
+  )
+}
+
+function DailyReportInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
