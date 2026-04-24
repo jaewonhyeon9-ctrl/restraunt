@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import RestaurantLocationCard from '@/components/owner/RestaurantLocationCard'
 import PendingOrdersCard from '@/components/owner/PendingOrdersCard'
 import EmployeePerformanceCard from '@/components/owner/EmployeePerformanceCard'
 import OwnerNotesCard from '@/components/owner/OwnerNotesCard'
+import KakaoIntegrationCard from '@/components/owner/KakaoIntegrationCard'
 
 // ──────────────────────────────────────────────
 // 타입 정의
@@ -299,6 +300,15 @@ export default function DashboardPage() {
         </div>
         <span className="text-amber-300">›</span>
       </Link>
+
+      {/* 카카오톡 연동 */}
+      <Suspense
+        fallback={
+          <div className="rounded-2xl bg-yellow-400/5 ring-1 ring-yellow-400/20 p-4 h-20" />
+        }
+      >
+        <KakaoIntegrationCard />
+      </Suspense>
 
       {/* 체크리스트 관리 */}
       <Link
