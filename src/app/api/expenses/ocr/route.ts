@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  checkAndConsumeOcrQuota,
+  refundOcrQuota,
+  PLAN_LABEL,
+} from '@/lib/ocr-quota'
 
 interface GeminiItem {
   name: string
@@ -61,6 +66,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
     }
 
+    const restaurantId = (session.user as { restaurantId?: string }).restaurantId
+    if (!restaurantId) {
+      return NextResponse.json({ error: '식당 정보가 없습니다' }, { status: 400 })
+    }
+
     const body = await req.json()
     const { image } = body as { image?: string }
 
@@ -71,6 +81,19 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_CLOUD_API_KEY
     if (!apiKey) {
       return NextResponse.json({ error: 'API 키가 설정되지 않았습니다' }, { status: 500 })
+    }
+
+    // OCR 월 한도 체크 + 사용량 1 증가
+    const quota = await checkAndConsumeOcrQuota(restaurantId)
+    if (!quota.ok) {
+      return NextResponse.json(
+        {
+          error: 'OCR 월 한도 초과',
+          detail: `${PLAN_LABEL[quota.plan]} 플랜은 월 ${quota.limit}회까지 OCR 사용 가능합니다. (이번달 사용: ${quota.used}회)`,
+          quota,
+        },
+        { status: 402 }
+      )
     }
 
     // Gemini 2.5 Flash로 영수증 분석
@@ -104,6 +127,7 @@ export async function POST(req: NextRequest) {
     if (!geminiRes.ok) {
       const err = await geminiRes.json().catch(() => ({}))
       console.error('Gemini API error:', err)
+      await refundOcrQuota(restaurantId)
       return NextResponse.json({ error: 'Gemini OCR 처리 실패: ' + JSON.stringify(err).slice(0, 200) }, { status: 502 })
     }
 
@@ -112,6 +136,7 @@ export async function POST(req: NextRequest) {
       geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
 
     if (!responseText) {
+      await refundOcrQuota(restaurantId)
       return NextResponse.json({ error: '인식 결과가 없습니다' }, { status: 422 })
     }
 
@@ -119,6 +144,7 @@ export async function POST(req: NextRequest) {
     try {
       parsed = JSON.parse(responseText) as GeminiReceipt
     } catch {
+      await refundOcrQuota(restaurantId)
       return NextResponse.json({ error: '응답 파싱 실패: ' + responseText.slice(0, 200) }, { status: 502 })
     }
 
@@ -144,11 +170,6 @@ export async function POST(req: NextRequest) {
 
     // ReceiptImage DB 저장
     const userId = session.user.id
-    const restaurantId = (session.user as { restaurantId?: string }).restaurantId
-
-    if (!restaurantId) {
-      return NextResponse.json({ error: '식당 정보가 없습니다' }, { status: 400 })
-    }
 
     const receipt = await prisma.receiptImage.create({
       data: {

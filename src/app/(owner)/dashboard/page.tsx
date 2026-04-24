@@ -7,6 +7,8 @@ import PendingOrdersCard from '@/components/owner/PendingOrdersCard'
 import EmployeePerformanceCard from '@/components/owner/EmployeePerformanceCard'
 import OwnerNotesCard from '@/components/owner/OwnerNotesCard'
 import KakaoIntegrationCard from '@/components/owner/KakaoIntegrationCard'
+import OcrUsageCard from '@/components/owner/OcrUsageCard'
+import SalesTrendCard from '@/components/owner/SalesTrendCard'
 
 // ──────────────────────────────────────────────
 // 타입 정의
@@ -237,6 +239,9 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* 매출 추이 */}
+      <SalesTrendCard />
+
       {/* 이번 달 누적 */}
       <Link href="/finance/monthly" className="block">
         <section className="glass-card p-4 active:scale-[0.99] transition">
@@ -300,6 +305,9 @@ export default function DashboardPage() {
         </div>
         <span className="text-amber-300">›</span>
       </Link>
+
+      {/* OCR 사용량 */}
+      <OcrUsageCard />
 
       {/* 카카오톡 연동 */}
       <Suspense

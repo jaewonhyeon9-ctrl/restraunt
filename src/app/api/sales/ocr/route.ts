@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import {
+  checkAndConsumeOcrQuota,
+  refundOcrQuota,
+  PLAN_LABEL,
+} from '@/lib/ocr-quota'
 
 interface ParsedSales {
   date: string | null
@@ -75,6 +80,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'API 키가 설정되지 않았습니다' }, { status: 500 })
     }
 
+    // OCR 월 한도 체크 + 사용량 1 증가
+    const quota = await checkAndConsumeOcrQuota(restaurantId)
+    if (!quota.ok) {
+      return NextResponse.json(
+        {
+          error: 'OCR 월 한도 초과',
+          detail: `${PLAN_LABEL[quota.plan]} 플랜은 월 ${quota.limit}회까지 OCR 사용 가능합니다. (이번달 사용: ${quota.used}회)`,
+          quota,
+        },
+        { status: 402 }
+      )
+    }
+
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
@@ -105,6 +123,7 @@ export async function POST(req: NextRequest) {
     if (!geminiRes.ok) {
       const err = await geminiRes.json().catch(() => ({}))
       console.error('Gemini API error (sales OCR):', err)
+      await refundOcrQuota(restaurantId)
       return NextResponse.json(
         { error: 'OCR 처리 실패: ' + JSON.stringify(err).slice(0, 200) },
         { status: 502 }
@@ -116,6 +135,7 @@ export async function POST(req: NextRequest) {
       geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
 
     if (!responseText) {
+      await refundOcrQuota(restaurantId)
       return NextResponse.json({ error: '인식 결과가 없습니다' }, { status: 422 })
     }
 
@@ -123,6 +143,7 @@ export async function POST(req: NextRequest) {
     try {
       parsed = JSON.parse(responseText) as ParsedSales
     } catch {
+      await refundOcrQuota(restaurantId)
       return NextResponse.json(
         { error: '응답 파싱 실패: ' + responseText.slice(0, 200) },
         { status: 502 }
