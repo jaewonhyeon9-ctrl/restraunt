@@ -42,7 +42,8 @@ export default function ChecklistAdminPage() {
   const [excelResult, setExcelResult] = useState<{
     created: number
     replacedCount: number
-    skipped: { row: number; reason: string }[]
+    sheets: { name: string; category: Category | null; created: number; skippedRows: number; parsed: boolean; reason?: string }[]
+    skipped: { sheet: string; row: number; reason: string }[]
   } | null>(null)
 
   const flash = (type: 'success' | 'error', text: string) => {
@@ -127,6 +128,7 @@ export default function ChecklistAdminPage() {
         setExcelResult({
           created: json.created,
           replacedCount: json.replacedCount ?? 0,
+          sheets: json.sheets ?? [],
           skipped: json.skipped ?? [],
         })
         setExcelFile(null)
@@ -386,10 +388,27 @@ export default function ChecklistAdminPage() {
           </button>
 
           {excelResult && (
-            <div className="mt-2 text-xs text-slate-300 space-y-1">
+            <div className="mt-2 text-xs text-slate-300 space-y-1.5">
               <p>✅ 추가됨: {excelResult.created}개</p>
               {excelResult.replacedCount > 0 && (
                 <p>🗑 기존 비활성화: {excelResult.replacedCount}개</p>
+              )}
+              {excelResult.sheets.length > 0 && (
+                <ul className="pl-2 space-y-0.5 text-[11px] text-slate-400">
+                  {excelResult.sheets.map((s, i) => (
+                    <li key={i}>
+                      {s.parsed ? '📄' : '⏭'} <strong className="text-slate-200">{s.name}</strong>
+                      {s.category && (
+                        <span className="ml-1 text-indigo-300">
+                          [{s.category === 'KITCHEN' ? '🍳 주방' : '🍽️ 서빙'}]
+                        </span>
+                      )}
+                      {s.parsed
+                        ? ` · ${s.created}개${s.skippedRows > 0 ? ` · 스킵 ${s.skippedRows}` : ''}`
+                        : ` · ${s.reason ?? '스킵'}`}
+                    </li>
+                  ))}
+                </ul>
               )}
               {excelResult.skipped.length > 0 && (
                 <details className="text-slate-400">
@@ -399,7 +418,7 @@ export default function ChecklistAdminPage() {
                   <ul className="mt-1 pl-4 list-disc space-y-0.5">
                     {excelResult.skipped.slice(0, 10).map((s, i) => (
                       <li key={i}>
-                        {s.row}행: {s.reason}
+                        [{s.sheet}] {s.row}행: {s.reason}
                       </li>
                     ))}
                     {excelResult.skipped.length > 10 && (

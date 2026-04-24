@@ -33,7 +33,14 @@ function normalizeText(raw: unknown): string | null {
   return s || null
 }
 
-// 헤더 후보 키워드 (이 중 2개 이상 포함된 행을 헤더로 간주)
+// 시트명에서 카테고리 자동 감지 (컬럼에 없을 때 fallback)
+function detectCategoryFromSheetName(sheetName: string): ChecklistCategory | null {
+  const s = sheetName.toLowerCase()
+  if (s.includes('주방') || s.includes('kitchen')) return 'KITCHEN'
+  if (s.includes('서빙') || s.includes('홀') || s.includes('hall')) return 'HALL'
+  return null
+}
+
 const HEADER_KEYWORDS = [
   '카테고리', 'category',
   '제목', 'title',
@@ -61,7 +68,7 @@ function detectHeaderRow(aoa: unknown[][]): number {
       bestHits = hits
     }
   }
-  return bestHits >= 2 ? best : 0
+  return bestHits >= 2 ? best : -1
 }
 
 function findCol(header: string[], ...candidates: string[]): number {
@@ -73,53 +80,25 @@ function findCol(header: string[], ...candidates: string[]): number {
   return -1
 }
 
-// POST: 엑셀 파일로 대량 생성
-// 지원 형식 2가지:
-//   1) 샘플 형식: 1행이 헤더, 컬럼 = 카테고리/시간대/시간/제목/설명/순서
-//   2) 자유 형식: 헤더가 여러 행 아래에 있고, 컬럼 = 시간/구분/항목/체크리스트 등
-//      - 엑셀에 카테고리 컬럼 없으면 form의 defaultCategory 사용
-//      - 병합 셀(시간/구분/항목)은 위 값으로 forward-fill
-//      - 항목+체크리스트 둘 다 있으면 항목=제목, 체크리스트=설명
-export async function POST(req: NextRequest) {
-  const ctx = await requireOwner()
-  if ('error' in ctx) {
-    return NextResponse.json({ error: ctx.error }, { status: ctx.status })
-  }
+type ParsedRow = {
+  category: ChecklistCategory
+  timeSlot: string | null
+  scheduledTime: string | null
+  title: string
+  description: string | null
+  sortOrder: number
+}
 
-  const form = await req.formData()
-  const file = form.get('file')
-  const replaceExisting = form.get('replaceExisting') === 'true'
-  const defaultCategoryRaw = form.get('defaultCategory')
-  const defaultCategory = normalizeCategory(defaultCategoryRaw)
+interface SheetParseResult {
+  parsed: ParsedRow[]
+  errors: { row: number; reason: string }[]
+  headerFound: boolean
+}
 
-  if (!(file instanceof File)) {
-    return NextResponse.json(
-      { error: '엑셀 파일을 첨부해주세요.' },
-      { status: 400 }
-    )
-  }
-
-  const buf = Buffer.from(await file.arrayBuffer())
-  let wb: XLSX.WorkBook
-  try {
-    wb = XLSX.read(buf, { type: 'buffer' })
-  } catch {
-    return NextResponse.json(
-      { error: '엑셀 파일을 읽을 수 없습니다.' },
-      { status: 400 }
-    )
-  }
-
-  const sheetName = wb.SheetNames[0]
-  if (!sheetName) {
-    return NextResponse.json(
-      { error: '시트를 찾을 수 없습니다.' },
-      { status: 400 }
-    )
-  }
-  const sheet = wb.Sheets[sheetName]
-
-  // array-of-arrays로 읽어서 헤더 자동 탐지
+function parseSheet(
+  sheet: XLSX.WorkSheet,
+  sheetDefaultCategory: ChecklistCategory | null
+): SheetParseResult {
   const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
     defval: null,
@@ -127,21 +106,20 @@ export async function POST(req: NextRequest) {
     blankrows: false,
   })
 
-  if (aoa.length === 0) {
-    return NextResponse.json(
-      { error: '엑셀이 비어있습니다.' },
-      { status: 400 }
-    )
-  }
+  const parsed: ParsedRow[] = []
+  const errors: { row: number; reason: string }[] = []
+
+  if (aoa.length === 0) return { parsed, errors, headerFound: false }
 
   const headerIdx = detectHeaderRow(aoa)
+  if (headerIdx < 0) return { parsed, errors, headerFound: false }
+
   const header = ((aoa[headerIdx] ?? []) as unknown[]).map((c) =>
     String(c ?? '').trim()
   )
 
   const colCategory = findCol(header, '카테고리', 'category')
   const colTitle = findCol(header, '제목', 'title', '항목')
-  // 체크리스트 컬럼이 별도로 있으면 설명으로 사용
   const colChecklist = findCol(header, '체크리스트', 'checklist')
   const colDescription = findCol(header, '설명', 'description')
   const colTimeSlot = findCol(header, '시간대', '타임슬롯', '구분', 'timeslot', 'time_slot')
@@ -155,39 +133,16 @@ export async function POST(req: NextRequest) {
   const titleColFinal = useItemChecklistPair ? colItemAsTitle : colTitle
   const descColFinal = useItemChecklistPair ? colChecklist : colDescription
 
-  if (titleColFinal < 0) {
-    return NextResponse.json(
-      {
-        error:
-          '헤더에서 제목/항목/체크리스트 컬럼을 찾지 못했습니다. 엑셀에 "제목" 또는 "항목" 또는 "체크리스트" 컬럼이 있어야 합니다.',
-      },
-      { status: 400 }
-    )
-  }
+  if (titleColFinal < 0) return { parsed, errors, headerFound: false }
 
   const bodyRows = aoa.slice(headerIdx + 1)
-
-  // 병합 셀 forward-fill 대상 컬럼
   const fillCols = [colTimeSlot, colScheduled].filter((c) => c >= 0)
   const lastValues: Record<number, unknown> = {}
 
-  type ParsedRow = {
-    category: ChecklistCategory
-    timeSlot: string | null
-    scheduledTime: string | null
-    title: string
-    description: string | null
-    sortOrder: number
-  }
-
-  const parsed: ParsedRow[] = []
-  const errors: { row: number; reason: string }[] = []
-
   bodyRows.forEach((row, idx) => {
-    const rowNum = idx + headerIdx + 2 // 1-based + header
+    const rowNum = idx + headerIdx + 2
     const cells = (row ?? []) as unknown[]
 
-    // forward-fill 먼저
     for (const c of fillCols) {
       const v = cells[c]
       if (v == null || String(v).trim() === '') {
@@ -200,16 +155,14 @@ export async function POST(req: NextRequest) {
     const getCell = (i: number): unknown => (i >= 0 ? cells[i] ?? null : null)
 
     const title = normalizeText(getCell(titleColFinal))
-    if (!title) return // 빈 제목 → 조용히 스킵 (푸터/빈 행)
+    if (!title) return
 
-    // 카테고리: 엑셀 컬럼 > defaultCategory fallback
     const excelCat = normalizeCategory(getCell(colCategory))
-    const category = excelCat ?? defaultCategory
+    const category = excelCat ?? sheetDefaultCategory
     if (!category) {
       errors.push({
         row: rowNum,
-        reason:
-          '카테고리를 찾을 수 없습니다. 엑셀에 카테고리 컬럼을 추가하거나 업로드 시 기본 카테고리를 선택해주세요.',
+        reason: '카테고리를 찾을 수 없습니다 (엑셀 컬럼/시트명/기본값 모두 없음).',
       })
       return
     }
@@ -218,7 +171,6 @@ export async function POST(req: NextRequest) {
     const timeSlotRaw = normalizeText(getCell(colTimeSlot))
     const scheduledRaw = normalizeText(getCell(colScheduled))
 
-    // 시간 파싱: HH:mm 형태면 scheduledTime에, 자연어면 timeSlot으로 흡수
     let scheduledTime: string | null = null
     let timeSlot: string | null = timeSlotRaw
     if (scheduledRaw) {
@@ -250,9 +202,95 @@ export async function POST(req: NextRequest) {
     })
   })
 
-  if (parsed.length === 0) {
+  return { parsed, errors, headerFound: true }
+}
+
+// POST: 엑셀 파일로 대량 생성 (다중 시트 지원)
+// 시트명에 "주방"/"홀" 들어있으면 해당 카테고리로 자동 지정
+// 엑셀에 카테고리 컬럼 있으면 그 값 우선
+// 둘 다 없으면 FormData의 defaultCategory 사용
+export async function POST(req: NextRequest) {
+  const ctx = await requireOwner()
+  if ('error' in ctx) {
+    return NextResponse.json({ error: ctx.error }, { status: ctx.status })
+  }
+
+  const form = await req.formData()
+  const file = form.get('file')
+  const replaceExisting = form.get('replaceExisting') === 'true'
+  const defaultCategoryRaw = form.get('defaultCategory')
+  const defaultCategory = normalizeCategory(defaultCategoryRaw)
+
+  if (!(file instanceof File)) {
+    return NextResponse.json({ error: '엑셀 파일을 첨부해주세요.' }, { status: 400 })
+  }
+
+  const buf = Buffer.from(await file.arrayBuffer())
+  let wb: XLSX.WorkBook
+  try {
+    wb = XLSX.read(buf, { type: 'buffer' })
+  } catch {
+    return NextResponse.json({ error: '엑셀 파일을 읽을 수 없습니다.' }, { status: 400 })
+  }
+
+  if (wb.SheetNames.length === 0) {
+    return NextResponse.json({ error: '시트를 찾을 수 없습니다.' }, { status: 400 })
+  }
+
+  interface SheetReport {
+    name: string
+    category: ChecklistCategory | null
+    created: number
+    skippedRows: number
+    parsed: boolean
+    reason?: string
+  }
+
+  const sheetReports: SheetReport[] = []
+  const allErrors: { sheet: string; row: number; reason: string }[] = []
+  const allParsed: ParsedRow[] = []
+
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName]
+    // 시트별 기본 카테고리: 시트명에서 감지 → 없으면 FormData defaultCategory
+    const sheetCategory =
+      detectCategoryFromSheetName(sheetName) ?? defaultCategory
+
+    const result = parseSheet(sheet, sheetCategory)
+
+    if (!result.headerFound) {
+      sheetReports.push({
+        name: sheetName,
+        category: sheetCategory,
+        created: 0,
+        skippedRows: 0,
+        parsed: false,
+        reason: '헤더/제목 컬럼을 찾지 못했습니다.',
+      })
+      continue
+    }
+
+    sheetReports.push({
+      name: sheetName,
+      category: sheetCategory,
+      created: result.parsed.length,
+      skippedRows: result.errors.length,
+      parsed: true,
+    })
+
+    allParsed.push(...result.parsed)
+    for (const e of result.errors) {
+      allErrors.push({ sheet: sheetName, row: e.row, reason: e.reason })
+    }
+  }
+
+  if (allParsed.length === 0) {
     return NextResponse.json(
-      { error: '업로드 가능한 항목이 없습니다.', errors },
+      {
+        error: '업로드 가능한 항목이 없습니다.',
+        sheets: sheetReports,
+        skipped: allErrors,
+      },
       { status: 400 }
     )
   }
@@ -267,7 +305,7 @@ export async function POST(req: NextRequest) {
       replacedCount = result.count
     }
     await tx.checklistTemplate.createMany({
-      data: parsed.map((p) => ({
+      data: allParsed.map((p) => ({
         restaurantId: ctx.restaurantId,
         title: p.title,
         description: p.description,
@@ -277,13 +315,14 @@ export async function POST(req: NextRequest) {
         sortOrder: p.sortOrder,
       })),
     })
-    return parsed.length
+    return allParsed.length
   })
 
   return NextResponse.json({
     success: true,
     created,
     replacedCount,
-    skipped: errors,
+    sheets: sheetReports,
+    skipped: allErrors,
   })
 }

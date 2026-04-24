@@ -42,17 +42,15 @@ function detectHeaderRow(aoa: unknown[][]): number {
       bestHits = hits
     }
   }
-  return bestHits >= 2 ? best : 0
+  return bestHits >= 2 ? best : -1
 }
 
 function findCol(header: string[], ...candidates: string[]): number {
   const norm = header.map(toKey)
-  // exact match first
   for (const name of candidates) {
     const i = norm.indexOf(name.toLowerCase())
     if (i >= 0) return i
   }
-  // substring match
   for (const name of candidates) {
     const i = norm.findIndex((h) => h.includes(name.toLowerCase()))
     if (i >= 0) return i
@@ -69,15 +67,12 @@ function parseAmount(raw: unknown): number {
   return Number.isFinite(n) ? Math.round(n) : 0
 }
 
-// YYYY-MM-DD string 반환 (다양한 입력 허용)
 function parseDate(raw: unknown): string | null {
   if (raw == null) return null
   if (raw instanceof Date && !isNaN(raw.getTime())) {
     return formatYMD(raw)
   }
-  // xlsx serial number (엑셀 날짜는 숫자로 저장됨)
   if (typeof raw === 'number' && raw > 20000 && raw < 80000) {
-    // xlsx date serial: days since 1899-12-30
     const d = XLSX.SSF.parse_date_code(raw)
     if (d) {
       return `${String(d.y).padStart(4, '0')}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`
@@ -86,20 +81,17 @@ function parseDate(raw: unknown): string | null {
   const s = String(raw).trim()
   if (!s) return null
 
-  // 2026-04-25, 2026/04/25, 2026.04.25
   let m = s.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/)
   if (m) {
     const [, y, mo, d] = m
     return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
   }
-  // 04/25, 04-25 → 올해로 간주
   m = s.match(/^(\d{1,2})[-./](\d{1,2})$/)
   if (m) {
     const [, mo, d] = m
     const y = new Date().getFullYear()
     return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
   }
-  // 2026-04-25 10:30:00 같은 datetime
   const dt = new Date(s)
   if (!isNaN(dt.getTime())) return formatYMD(dt)
   return null
@@ -110,19 +102,121 @@ function formatYMD(d: Date): string {
 }
 
 type Source = 'AUTO' | 'POS' | 'BAEMIN' | 'COUPANG_EATS' | 'YOGIYO'
+type ResolvedSource = Exclude<Source, 'AUTO'>
 
-function detectSourceFromSheet(sheetName: string, fileName: string): Source {
-  const s = (sheetName + ' ' + fileName).toLowerCase()
-  if (s.includes('배민') || s.includes('baemin')) return 'BAEMIN'
+function detectSourceFromName(...names: string[]): ResolvedSource {
+  const s = names.join(' ').toLowerCase()
+  if (s.includes('배민') || s.includes('baemin') || s.includes('배달의민족')) return 'BAEMIN'
   if (s.includes('쿠팡') || s.includes('coupang')) return 'COUPANG_EATS'
   if (s.includes('요기요') || s.includes('yogiyo')) return 'YOGIYO'
   return 'POS'
 }
 
-// POST: 매출 엑셀/CSV 대량 업로드
+interface DayAgg {
+  amount: number
+  cashAmount: number
+  cardAmount: number
+  deliveryAmount: number
+}
+
+interface SheetParseResult {
+  perDay: Map<string, DayAgg>
+  errors: { row: number; reason: string }[]
+  headerFound: boolean
+}
+
+function parseSheet(
+  sheet: XLSX.WorkSheet,
+  sheetSource: ResolvedSource
+): SheetParseResult {
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: null,
+    raw: true,
+    blankrows: false,
+  })
+
+  const perDay = new Map<string, DayAgg>()
+  const errors: { row: number; reason: string }[] = []
+
+  if (aoa.length === 0) return { perDay, errors, headerFound: false }
+
+  const headerIdx = detectHeaderRow(aoa)
+  if (headerIdx < 0) return { perDay, errors, headerFound: false }
+
+  const header = ((aoa[headerIdx] ?? []) as unknown[]).map((c) =>
+    String(c ?? '').trim()
+  )
+
+  const colDate = findCol(header, '날짜', '일자', '영업일', '주문일자', '주문일', '거래일자', '거래일', '결제일자', '결제일', 'date')
+  const colAmount = findCol(
+    header,
+    '총매출', '총매출액', '총액', '합계',
+    '매출액', '매출',
+    '결제금액', '판매금액', '정산금액', '실수령액',
+    'amount', 'total', 'sales'
+  )
+  const colCash = findCol(header, '현금', '현금매출', 'cash')
+  const colCard = findCol(header, '카드', '카드매출', '신용카드', '체크카드', 'card')
+  const colDelivery = findCol(header, '배달', '배달매출', 'delivery')
+
+  if (colDate < 0) return { perDay, errors, headerFound: false }
+  if (colAmount < 0 && colCash < 0 && colCard < 0 && colDelivery < 0) {
+    return { perDay, errors, headerFound: false }
+  }
+
+  const bodyRows = aoa.slice(headerIdx + 1)
+  const isDeliverySource =
+    sheetSource === 'BAEMIN' || sheetSource === 'COUPANG_EATS' || sheetSource === 'YOGIYO'
+
+  bodyRows.forEach((row, idx) => {
+    const rowNum = idx + headerIdx + 2
+    const cells = (row ?? []) as unknown[]
+    const get = (i: number): unknown => (i >= 0 ? cells[i] ?? null : null)
+
+    const dateStr = parseDate(get(colDate))
+    if (!dateStr) return
+
+    const rawAmount = parseAmount(get(colAmount))
+    const cashAmt = parseAmount(get(colCash))
+    const cardAmt = parseAmount(get(colCard))
+    const deliveryAmt = parseAmount(get(colDelivery))
+
+    let amount = rawAmount
+    if (amount === 0) amount = cashAmt + cardAmt + deliveryAmt
+    if (amount === 0) {
+      errors.push({ row: rowNum, reason: '매출 금액이 0 또는 비어있습니다.' })
+      return
+    }
+
+    // 배달앱 소스 시트 → 전액 배달로 귀속
+    let cash = cashAmt
+    let card = cardAmt
+    let delivery = deliveryAmt
+    if (isDeliverySource) {
+      delivery = amount
+      cash = 0
+      card = 0
+    }
+
+    const prev = perDay.get(dateStr)
+    if (prev) {
+      prev.amount += amount
+      prev.cashAmount += cash
+      prev.cardAmount += card
+      prev.deliveryAmount += delivery
+    } else {
+      perDay.set(dateStr, { amount, cashAmount: cash, cardAmount: card, deliveryAmount: delivery })
+    }
+  })
+
+  return { perDay, errors, headerFound: true }
+}
+
+// POST: 매출 엑셀/CSV 대량 업로드 (다중 시트 지원)
 // FormData:
 //   file: xlsx/xls/csv
-//   source: AUTO | POS | BAEMIN | COUPANG_EATS | YOGIYO (기본 AUTO)
+//   source: AUTO | POS | BAEMIN | COUPANG_EATS | YOGIYO (기본 AUTO = 시트별 자동 감지)
 //   replaceExisting: 'true' | 'false' — 업로드 범위의 기존 매출 덮어쓰기
 export async function POST(req: NextRequest) {
   const ctx = await requireAuth()
@@ -147,7 +241,6 @@ export async function POST(req: NextRequest) {
   const buf = Buffer.from(await file.arrayBuffer())
   let wb: XLSX.WorkBook
   try {
-    // xlsx는 csv도 인식
     wb = XLSX.read(buf, { type: 'buffer', cellDates: true })
   } catch {
     return NextResponse.json(
@@ -156,140 +249,88 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const sheetName = wb.SheetNames[0]
-  if (!sheetName) {
-    return NextResponse.json(
-      { error: '시트를 찾을 수 없습니다.' },
-      { status: 400 }
-    )
-  }
-  const sheet = wb.Sheets[sheetName]
-
-  const effectiveSource: Source =
-    source === 'AUTO' ? detectSourceFromSheet(sheetName, file.name) : source
-
-  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-    header: 1,
-    defval: null,
-    raw: true,
-    blankrows: false,
-  })
-
-  if (aoa.length === 0) {
-    return NextResponse.json({ error: '파일이 비어있습니다.' }, { status: 400 })
+  if (wb.SheetNames.length === 0) {
+    return NextResponse.json({ error: '시트를 찾을 수 없습니다.' }, { status: 400 })
   }
 
-  const headerIdx = detectHeaderRow(aoa)
-  const header = ((aoa[headerIdx] ?? []) as unknown[]).map((c) =>
-    String(c ?? '').trim()
-  )
-
-  const colDate = findCol(header, '날짜', '일자', '영업일', '주문일자', '주문일', '거래일자', '거래일', '결제일자', '결제일', 'date')
-  const colAmount = findCol(
-    header,
-    '총매출', '총매출액', '총액', '합계',
-    '매출액', '매출',
-    '결제금액', '판매금액', '정산금액', '실수령액',
-    'amount', 'total', 'sales'
-  )
-  const colCash = findCol(header, '현금', '현금매출', 'cash')
-  const colCard = findCol(header, '카드', '카드매출', '신용카드', '체크카드', 'card')
-  const colDelivery = findCol(header, '배달', '배달매출', 'delivery')
-
-  if (colDate < 0) {
-    return NextResponse.json(
-      { error: '날짜 컬럼을 찾지 못했습니다. 헤더에 "날짜", "일자", "영업일" 같은 이름이 있어야 합니다.' },
-      { status: 400 }
-    )
-  }
-  if (colAmount < 0 && colCash < 0 && colCard < 0 && colDelivery < 0) {
-    return NextResponse.json(
-      { error: '매출 컬럼을 찾지 못했습니다. "매출", "총매출", "결제금액" 같은 컬럼이 필요합니다.' },
-      { status: 400 }
-    )
+  interface SheetReport {
+    name: string
+    source: ResolvedSource
+    days: number
+    skippedRows: number
+    parsed: boolean
+    reason?: string
   }
 
-  const bodyRows = aoa.slice(headerIdx + 1)
+  const sheetReports: SheetReport[] = []
+  const allErrors: { sheet: string; row: number; reason: string }[] = []
+  const perDayTotal = new Map<string, DayAgg>()
 
-  // 날짜별 집계 (같은 날 여러 행이면 합산)
-  const perDay = new Map<string, {
-    amount: number
-    cashAmount: number
-    cardAmount: number
-    deliveryAmount: number
-    rowCount: number
-  }>()
-  const errors: { row: number; reason: string }[] = []
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName]
+    // 시트별 소스: source가 명시적이면 그대로, AUTO면 시트명 + 파일명으로 감지
+    const sheetSource: ResolvedSource =
+      source === 'AUTO'
+        ? detectSourceFromName(sheetName, file.name)
+        : source
 
-  bodyRows.forEach((row, idx) => {
-    const rowNum = idx + headerIdx + 2
-    const cells = (row ?? []) as unknown[]
-    const get = (i: number): unknown => (i >= 0 ? cells[i] ?? null : null)
+    const result = parseSheet(sheet, sheetSource)
 
-    const dateStr = parseDate(get(colDate))
-    if (!dateStr) return // 조용히 스킵 (빈 행 / 합계 행 / 푸터)
-
-    const rawAmount = parseAmount(get(colAmount))
-    const cashAmt = parseAmount(get(colCash))
-    const cardAmt = parseAmount(get(colCard))
-    const deliveryAmt = parseAmount(get(colDelivery))
-
-    // 총매출 컬럼이 없으면 결제수단 합으로 추정
-    let amount = rawAmount
-    if (amount === 0) {
-      amount = cashAmt + cardAmt + deliveryAmt
-    }
-    if (amount === 0) {
-      errors.push({ row: rowNum, reason: '매출 금액이 0 또는 비어있습니다.' })
-      return
-    }
-
-    // 배달앱 소스면 전액 배달로 귀속
-    let cash = cashAmt
-    let card = cardAmt
-    let delivery = deliveryAmt
-    if (effectiveSource === 'BAEMIN' || effectiveSource === 'COUPANG_EATS' || effectiveSource === 'YOGIYO') {
-      delivery = amount
-      cash = 0
-      card = 0
-    }
-
-    const prev = perDay.get(dateStr)
-    if (prev) {
-      prev.amount += amount
-      prev.cashAmount += cash
-      prev.cardAmount += card
-      prev.deliveryAmount += delivery
-      prev.rowCount += 1
-    } else {
-      perDay.set(dateStr, {
-        amount,
-        cashAmount: cash,
-        cardAmount: card,
-        deliveryAmount: delivery,
-        rowCount: 1,
+    if (!result.headerFound) {
+      sheetReports.push({
+        name: sheetName,
+        source: sheetSource,
+        days: 0,
+        skippedRows: 0,
+        parsed: false,
+        reason: '헤더/매출 컬럼을 찾지 못했습니다.',
       })
+      continue
     }
-  })
 
-  if (perDay.size === 0) {
+    // 누적
+    for (const [date, agg] of result.perDay) {
+      const prev = perDayTotal.get(date)
+      if (prev) {
+        prev.amount += agg.amount
+        prev.cashAmount += agg.cashAmount
+        prev.cardAmount += agg.cardAmount
+        prev.deliveryAmount += agg.deliveryAmount
+      } else {
+        perDayTotal.set(date, { ...agg })
+      }
+    }
+
+    sheetReports.push({
+      name: sheetName,
+      source: sheetSource,
+      days: result.perDay.size,
+      skippedRows: result.errors.length,
+      parsed: true,
+    })
+
+    for (const e of result.errors) {
+      allErrors.push({ sheet: sheetName, row: e.row, reason: e.reason })
+    }
+  }
+
+  if (perDayTotal.size === 0) {
     return NextResponse.json(
-      { error: '업로드 가능한 매출이 없습니다.', errors },
+      {
+        error: '업로드 가능한 매출이 없습니다.',
+        sheets: sheetReports,
+        skipped: allErrors,
+      },
       { status: 400 }
     )
   }
 
-  const sortedDays = [...perDay.keys()].sort()
-  const startDate = new Date(sortedDays[0])
-  const endDate = new Date(sortedDays[sortedDays.length - 1])
-  endDate.setDate(endDate.getDate() + 1)
+  const sortedDays = [...perDayTotal.keys()].sort()
 
-  // replaceExisting: 업로드 범위 내 기존 매출 조회 후 병합 규칙 결정
-  // 기본 정책: upsert (같은 날짜면 덮어쓰기) + 배달앱 소스는 deliveryAmount만 병합
   let upserted = 0
   let merged = 0
 
-  for (const [dateStr, agg] of perDay) {
+  for (const [dateStr, agg] of perDayTotal) {
     const saleDateObj = new Date(dateStr)
     const existing = await prisma.sale.findUnique({
       where: {
@@ -300,64 +341,62 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // 배달앱 소스 + 기존 레코드 존재 → 기존 값 유지하고 deliveryAmount만 덮어쓰기
-    const isDeliverySource =
-      effectiveSource === 'BAEMIN' ||
-      effectiveSource === 'COUPANG_EATS' ||
-      effectiveSource === 'YOGIYO'
-
-    if (existing && isDeliverySource && !replaceExisting) {
-      const newDelivery = agg.deliveryAmount
-      const newAmount = existing.cashAmount + existing.cardAmount + newDelivery
+    if (!existing || replaceExisting) {
+      await prisma.sale.upsert({
+        where: {
+          restaurantId_saleDate: {
+            restaurantId: ctx.restaurantId,
+            saleDate: saleDateObj,
+          },
+        },
+        create: {
+          restaurantId: ctx.restaurantId,
+          userId: ctx.userId,
+          saleDate: saleDateObj,
+          amount: agg.amount,
+          cashAmount: agg.cashAmount,
+          cardAmount: agg.cardAmount,
+          deliveryAmount: agg.deliveryAmount,
+        },
+        update: {
+          userId: ctx.userId,
+          amount: agg.amount,
+          cashAmount: agg.cashAmount,
+          cardAmount: agg.cardAmount,
+          deliveryAmount: agg.deliveryAmount,
+        },
+      })
+      upserted += 1
+    } else {
+      // 병합: 0이 아닌 필드만 덮어쓰기 (배민-only 파일 올리면 배달만 갱신, POS 유지)
+      const newCash = agg.cashAmount > 0 ? agg.cashAmount : existing.cashAmount
+      const newCard = agg.cardAmount > 0 ? agg.cardAmount : existing.cardAmount
+      const newDelivery = agg.deliveryAmount > 0 ? agg.deliveryAmount : existing.deliveryAmount
+      const newAmount = newCash + newCard + newDelivery
       await prisma.sale.update({
         where: { id: existing.id },
         data: {
-          amount: newAmount,
-          deliveryAmount: newDelivery,
           userId: ctx.userId,
+          amount: newAmount,
+          cashAmount: newCash,
+          cardAmount: newCard,
+          deliveryAmount: newDelivery,
         },
       })
       merged += 1
-      continue
     }
-
-    await prisma.sale.upsert({
-      where: {
-        restaurantId_saleDate: {
-          restaurantId: ctx.restaurantId,
-          saleDate: saleDateObj,
-        },
-      },
-      create: {
-        restaurantId: ctx.restaurantId,
-        userId: ctx.userId,
-        saleDate: saleDateObj,
-        amount: agg.amount,
-        cashAmount: agg.cashAmount,
-        cardAmount: agg.cardAmount,
-        deliveryAmount: agg.deliveryAmount,
-      },
-      update: {
-        userId: ctx.userId,
-        amount: agg.amount,
-        cashAmount: agg.cashAmount,
-        cardAmount: agg.cardAmount,
-        deliveryAmount: agg.deliveryAmount,
-      },
-    })
-    upserted += 1
   }
 
   return NextResponse.json({
     success: true,
-    source: effectiveSource,
-    days: perDay.size,
+    sheets: sheetReports,
+    totalDays: perDayTotal.size,
     upserted,
     merged,
     dateRange: {
       start: sortedDays[0],
       end: sortedDays[sortedDays.length - 1],
     },
-    skipped: errors,
+    skipped: allErrors,
   })
 }

@@ -112,12 +112,12 @@ export default function DailyFinancePage() {
   const [uploadReplaceExisting, setUploadReplaceExisting] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<{
-    source: string
-    days: number
+    sheets: { name: string; source: string; days: number; skippedRows: number; parsed: boolean; reason?: string }[]
+    totalDays: number
     upserted: number
     merged: number
     dateRange: { start: string; end: string }
-    skipped: { row: number; reason: string }[]
+    skipped: { sheet: string; row: number; reason: string }[]
   } | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
@@ -284,8 +284,8 @@ export default function DailyFinancePage() {
         return
       }
       setUploadResult({
-        source: json.source,
-        days: json.days,
+        sheets: json.sheets ?? [],
+        totalDays: json.totalDays ?? 0,
         upserted: json.upserted,
         merged: json.merged,
         dateRange: json.dateRange,
@@ -755,16 +755,25 @@ export default function DailyFinancePage() {
             )}
 
             {uploadResult && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs px-3 py-2 space-y-1">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs px-3 py-2 space-y-1.5">
                 <p className="font-semibold">
-                  ✅ 소스: {uploadResult.source} / {uploadResult.days}일 집계
+                  ✅ {uploadResult.sheets.filter((s) => s.parsed).length}개 시트 / 총 {uploadResult.totalDays}일 집계
                 </p>
                 <p>
                   기간: {uploadResult.dateRange.start} ~ {uploadResult.dateRange.end}
                 </p>
                 <p>
-                  신규/덮어쓰기: {uploadResult.upserted}건, 배달 병합: {uploadResult.merged}건
+                  신규/덮어쓰기: {uploadResult.upserted}건, 병합: {uploadResult.merged}건
                 </p>
+                <ul className="mt-1 pl-3 space-y-0.5 text-[11px] text-emerald-900/80">
+                  {uploadResult.sheets.map((s, i) => (
+                    <li key={i}>
+                      {s.parsed ? '📄' : '⏭'} <strong>{s.name}</strong>{' '}
+                      <span className="text-emerald-700">[{s.source === 'BAEMIN' ? '배민' : s.source === 'COUPANG_EATS' ? '쿠팡이츠' : s.source === 'YOGIYO' ? '요기요' : s.source}]</span>
+                      {s.parsed ? ` · ${s.days}일${s.skippedRows > 0 ? ` · 스킵 ${s.skippedRows}` : ''}` : ` · ${s.reason ?? '스킵'}`}
+                    </li>
+                  ))}
+                </ul>
                 {uploadResult.skipped.length > 0 && (
                   <details>
                     <summary className="cursor-pointer text-amber-700">
@@ -773,7 +782,7 @@ export default function DailyFinancePage() {
                     <ul className="mt-1 pl-4 list-disc space-y-0.5">
                       {uploadResult.skipped.slice(0, 10).map((s, i) => (
                         <li key={i}>
-                          {s.row}행: {s.reason}
+                          [{s.sheet}] {s.row}행: {s.reason}
                         </li>
                       ))}
                       {uploadResult.skipped.length > 10 && (
