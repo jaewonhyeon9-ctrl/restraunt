@@ -5,6 +5,7 @@ import Link from 'next/link'
 import RestaurantLocationCard from '@/components/owner/RestaurantLocationCard'
 import PendingOrdersCard from '@/components/owner/PendingOrdersCard'
 import EmployeePerformanceCard from '@/components/owner/EmployeePerformanceCard'
+import OwnerNotesCard from '@/components/owner/OwnerNotesCard'
 
 // ──────────────────────────────────────────────
 // 타입 정의
@@ -107,7 +108,6 @@ function SummaryCard({
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardSummary | null>(null)
-  const [pendingOrderCount, setPendingOrderCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -121,9 +121,6 @@ export default function DashboardPage() {
           throw new Error(`${json?.error ?? '데이터를 불러오지 못했습니다.'}${detail}`)
         }
         setData(json)
-        if (typeof json.pendingOrderCount === 'number') {
-          setPendingOrderCount(json.pendingOrderCount)
-        }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : '오류가 발생했습니다.')
       } finally {
@@ -131,21 +128,7 @@ export default function DashboardPage() {
       }
     }
 
-    const fetchPendingOrders = async () => {
-      try {
-        const res = await fetch('/api/orders?status=PENDING')
-        if (!res.ok) return
-        const json = await res.json()
-        if (Array.isArray(json)) {
-          setPendingOrderCount(json.length)
-        }
-      } catch {
-        // 조용히 무시
-      }
-    }
-
     fetchSummary()
-    fetchPendingOrders()
   }, [])
 
   return (
@@ -203,10 +186,11 @@ export default function DashboardPage() {
         </svg>
       </Link>
 
-      {/* 대기 중 발주 요청 카드 */}
-      {!loading && pendingOrderCount > 0 && (
-        <PendingOrdersCard count={pendingOrderCount} />
-      )}
+      {/* 대기 중 발주 요청 카드 (품목 상세) */}
+      <PendingOrdersCard />
+
+      {/* 사장님께 전달사항 */}
+      <OwnerNotesCard />
 
       {/* 안전재고 이하 알림 */}
       {!loading && data && data.lowStockCount > 0 && (
@@ -300,6 +284,21 @@ export default function DashboardPage() {
 
       {/* 직원 업무 성과율 */}
       <EmployeePerformanceCard />
+
+      {/* 오늘 마감 리포트 */}
+      <Link
+        href="/finance/daily/report"
+        className="flex items-center gap-3 rounded-2xl p-4 transition active:scale-[0.99] ring-1 ring-amber-400/30 bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-500/5"
+      >
+        <span className="text-2xl">📊</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-amber-100">오늘 마감 리포트</p>
+          <p className="text-xs text-amber-300/80 mt-0.5">
+            매출·지출·근무·체크리스트 한눈에 + 카톡 공유
+          </p>
+        </div>
+        <span className="text-amber-300">›</span>
+      </Link>
 
       {/* 체크리스트 관리 */}
       <Link

@@ -17,9 +17,12 @@ function parseDateParam(raw: string | null): Date {
   return d
 }
 
-// GET: 특정 날짜의 메모 조회
-// query: ?date=YYYY-MM-DD (default: today)
+// GET: 메모 조회
+// query: ?date=YYYY-MM-DD (default: today, sinceDays가 없을 때만 적용)
+//        ?sinceDays=N (최근 N일 범위로 조회. 지정 시 date 무시)
+//        ?type=HANDOVER|ANOMALY|OWNER_NOTE|COMPLAINT (optional filter)
 //        ?category=KITCHEN|HALL (optional filter)
+//        ?limit=N (최대 건수, 기본 50)
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
@@ -37,21 +40,43 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url)
-  const date = parseDateParam(searchParams.get('date'))
   const category = searchParams.get('category')
+  const typeParam = searchParams.get('type')?.toUpperCase()
+  const sinceDaysRaw = searchParams.get('sinceDays')
+  const limitRaw = searchParams.get('limit')
 
   const where: {
     restaurantId: string
-    date: Date
+    date?: Date | { gte: Date; lte: Date }
     category?: ChecklistCategory
-  } = { restaurantId, date }
+    type?: DailyNoteType
+  } = { restaurantId }
+
+  if (sinceDaysRaw) {
+    const days = Math.max(1, Math.min(90, Number(sinceDaysRaw) || 7))
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - (days - 1))
+    const end = new Date()
+    end.setHours(23, 59, 59, 999)
+    where.date = { gte: start, lte: end }
+  } else {
+    where.date = parseDateParam(searchParams.get('date'))
+  }
+
   if (category && VALID_CATEGORY.has(category)) {
     where.category = category as ChecklistCategory
   }
+  if (typeParam && VALID_TYPE.has(typeParam)) {
+    where.type = typeParam as DailyNoteType
+  }
+
+  const take = Math.max(1, Math.min(200, Number(limitRaw) || 50))
 
   const notes = await prisma.dailyNote.findMany({
     where,
     orderBy: { createdAt: 'desc' },
+    take,
     include: {
       user: { select: { id: true, name: true } },
     },

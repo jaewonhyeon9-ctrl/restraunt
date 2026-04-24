@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
 type Period = 'today' | 'week' | 'month'
@@ -160,12 +161,18 @@ export default function EmployeePerformanceCard() {
                 className="rounded-xl bg-white/5 ring-1 ring-white/5 p-3"
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-1.5 min-w-0">
+                  <Link
+                    href={`/employees/${e.userId}`}
+                    className="flex items-center gap-1.5 min-w-0 group active:opacity-70"
+                  >
                     {medal && <span className="text-sm">{medal}</span>}
-                    <span className="text-sm font-semibold text-slate-100 truncate">
+                    <span className="text-sm font-semibold text-slate-100 truncate group-hover:text-indigo-300 transition-colors">
                       {e.name}
                     </span>
-                  </div>
+                    <span className="text-slate-500 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                      ›
+                    </span>
+                  </Link>
                   <div className="flex items-baseline gap-1.5 shrink-0">
                     <span className={`text-base font-bold tabular-nums ${tone.text}`}>
                       {e.percent}%
