@@ -11,7 +11,15 @@ export const proxy = auth((req) => {
   const user = req.auth?.user as { role?: string } | undefined
 
   // 공개 경로 (로그인 없이 접근 가능)
-  const PUBLIC_PATHS = ['/login', '/api/auth', '/privacy', '/terms', '/offline']
+  const PUBLIC_PATHS = [
+    '/login',
+    '/signup',
+    '/guide',
+    '/api/auth',
+    '/privacy',
+    '/terms',
+    '/offline',
+  ]
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
 
   // 인증 안 된 경우
@@ -22,8 +30,8 @@ export const proxy = auth((req) => {
   if (user) {
     const role = user.role
 
-    // 로그인 상태에서 /login 또는 루트 접근 시 역할별 홈으로
-    if (pathname === '/login' || pathname === '/') {
+    // 로그인 상태에서 /login, /signup, 루트 접근 시 역할별 홈으로
+    if (pathname === '/login' || pathname === '/signup' || pathname === '/') {
       return NextResponse.redirect(new URL(role === 'OWNER' ? '/dashboard' : '/home', req.url))
     }
 

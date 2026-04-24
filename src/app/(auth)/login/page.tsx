@@ -1,16 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { signIn, getSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('signup') === 'ok') {
+      setInfo('회원가입 완료! 가입한 이메일로 로그인해주세요.')
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,6 +121,12 @@ export default function LoginPage() {
                 />
               </div>
 
+              {info && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+                  <p className="text-sm text-emerald-300">{info}</p>
+                </div>
+              )}
+
               {error && (
                 <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
                   <p className="text-sm text-red-300">{error}</p>
@@ -136,10 +151,35 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-500 mt-6">
-          관리자에게 계정 발급을 문의하세요
+        <p className="text-center text-sm text-slate-400 mt-6">
+          아직 계정이 없으신가요?{' '}
+          <Link
+            href="/signup"
+            className="text-indigo-300 font-semibold hover:text-indigo-200"
+          >
+            사장님 회원가입
+          </Link>
+        </p>
+        <p className="text-center text-xs text-slate-500 mt-2">
+          <Link href="/guide" className="hover:text-slate-300 underline">
+            사용 가이드 보기
+          </Link>
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-slate-500">
+          불러오는 중...
+        </div>
+      }
+    >
+      <LoginInner />
+    </Suspense>
   )
 }
