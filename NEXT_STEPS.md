@@ -1,6 +1,38 @@
 # 오토드림 — 진행 상황 & 내일 할 일
 
-> 최종 업데이트: 2026-04-22 저녁
+> 최종 업데이트: 2026-04-25 저녁
+
+---
+
+## 🆕 2026-04-25 완료
+
+### ✅ Supabase SQL 마이그레이션 실행 완료
+- `ChecklistCategory` enum, `ChecklistTemplate.category/scheduledTime` 컬럼 추가
+- `DailyNote` 테이블 + `DailyNoteType` enum 추가
+- 프로덕션 DB 반영 완료 (Node + pg로 직접 실행)
+
+### ✅ 체크리스트 엑셀 업로드 확장
+- 헤더 행 자동 탐지 (상위 15행 중 키워드 매칭)
+- 병합 셀 forward-fill (시간/구분 컬럼)
+- `항목` + `체크리스트` 둘 다 있으면 → 항목=제목, 체크리스트=설명
+- 카테고리 컬럼 없으면 UI 드롭다운 기본값 사용
+- 자연어 시간 (예: "오픈 1시간전") → timeSlot으로 흡수
+
+### ✅ 매출 연동 4-tier 기능 추가
+- 엑셀/CSV 업로드: [/api/sales/bulk](src/app/api/sales/bulk/route.ts)
+  - 컬럼 자동 감지 (날짜/총매출/현금/카드/배달 다양한 alias)
+  - 소스 선택 (자동/POS/배민/쿠팡이츠/요기요)
+  - 배달앱 소스 시 배달 부분만 병합 (기존 POS 매출 유지)
+- 사진 OCR: [/api/sales/ocr](src/app/api/sales/ocr/route.ts)
+  - Gemini 2.5 Flash Vision 재사용 (영수증 OCR과 동일 인프라)
+  - POS 마감 화면/배달앱 정산 화면 자동 구분
+  - `GEMINI_API_KEY` 기존 키 그대로 사용
+- UI: 일별 손익 페이지 헤더에 "📥 POS" 버튼 + 매출 입력 모달에 "📷 POS 화면 사진으로 자동 입력" 버튼
+
+### 🎯 제품 전략 결정
+- **무료 기본 기능**: 직접 입력 / 엑셀 / CSV / OCR (4-tier)
+- **유료 B2B 분리**: 헤르메스 에이전트 등 실시간 연동 → 개별 컨설팅/교육/연동비
+- **푸드테크 파트너십**: 사용자 1000명+ 후 재검토
 
 ---
 

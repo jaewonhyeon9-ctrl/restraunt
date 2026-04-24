@@ -38,6 +38,7 @@ export default function ChecklistAdminPage() {
 
   const [excelFile, setExcelFile] = useState<File | null>(null)
   const [replaceExisting, setReplaceExisting] = useState(false)
+  const [defaultCategory, setDefaultCategory] = useState<Category>('HALL')
   const [excelResult, setExcelResult] = useState<{
     created: number
     replacedCount: number
@@ -113,6 +114,7 @@ export default function ChecklistAdminPage() {
       const fd = new FormData()
       fd.append('file', excelFile)
       fd.append('replaceExisting', String(replaceExisting))
+      fd.append('defaultCategory', defaultCategory)
       const res = await fetch('/api/checklist/templates/bulk', {
         method: 'POST',
         body: fd,
@@ -316,9 +318,11 @@ export default function ChecklistAdminPage() {
             엑셀로 한꺼번에 등록
           </h2>
           <p className="text-xs text-slate-400 leading-relaxed">
-            컬럼 순서: <strong className="text-slate-200">카테고리</strong>{' '}
-            (주방/서빙), <strong className="text-slate-200">시간대</strong>,{' '}
-            <strong className="text-slate-200">제목</strong>, 설명(선택), 순서(선택)
+            자유 형식 지원: 헤더 행을 자동 인식하고 병합 셀도 처리합니다.{' '}
+            <strong className="text-slate-200">제목</strong>/
+            <strong className="text-slate-200">항목</strong>/
+            <strong className="text-slate-200">체크리스트</strong> 컬럼 중 하나만 있으면 업로드 가능.{' '}
+            카테고리 컬럼이 없으면 아래 <strong className="text-slate-200">기본 카테고리</strong>로 일괄 등록됩니다.
           </p>
           <a
             href="/api/checklist/templates/sample"
@@ -328,6 +332,33 @@ export default function ChecklistAdminPage() {
           </a>
 
           <div className="pt-2">
+            <label className="block text-xs font-medium text-slate-400 mb-1">
+              기본 카테고리 (엑셀에 카테고리 컬럼이 없을 때 사용)
+            </label>
+            <div className="flex gap-2">
+              {(['KITCHEN', 'HALL'] as Category[]).map((c) => {
+                const meta = CATEGORY_META[c]
+                const isActive = defaultCategory === c
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setDefaultCategory(c)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${
+                      isActive
+                        ? 'bg-white/10 ring-1 ring-white/20 text-slate-100'
+                        : 'bg-white/5 ring-1 ring-white/5 text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    <span className="mr-1">{meta.icon}</span>
+                    {meta.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="pt-1">
             <input
               type="file"
               accept=".xlsx,.xls"
