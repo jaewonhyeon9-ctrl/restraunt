@@ -111,21 +111,6 @@ export default function KakaoIntegrationCard() {
     }
   }
 
-  async function handleChangeHour(hour: number) {
-    if (!status || busy) return
-    setBusy(true)
-    try {
-      const res = await fetch('/api/integrations/kakao/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sendHour: hour }),
-      })
-      if (res.ok) refresh()
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function handleDisconnect() {
     if (!confirm('카카오 연결을 해제하시겠습니까?')) return
     setBusy(true)
@@ -197,7 +182,7 @@ export default function KakaoIntegrationCard() {
               <p className="text-xs font-semibold text-slate-200">매일 자동 발송</p>
               <p className="text-[10px] text-slate-500">
                 {status.dailyReportEnabled
-                  ? `매일 ${status.sendHour}시에 카톡으로 보내드려요`
+                  ? '매일 밤 11시(KST)에 카톡으로 보내드려요'
                   : '자동 발송 꺼짐'}
               </p>
             </div>
@@ -215,27 +200,6 @@ export default function KakaoIntegrationCard() {
               />
             </button>
           </div>
-
-          {/* 발송 시간 */}
-          {status.dailyReportEnabled && (
-            <div>
-              <label className="block text-[10px] text-slate-500 mb-1">
-                발송 시간
-              </label>
-              <select
-                value={status.sendHour}
-                onChange={(e) => handleChangeHour(Number(e.target.value))}
-                disabled={busy}
-                className="w-full bg-white/5 text-slate-100 text-sm rounded-lg px-3 py-2 ring-1 ring-white/10 focus:outline-none focus:ring-yellow-400"
-              >
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={i} className="bg-slate-900">
-                    {i.toString().padStart(2, '0')}:00
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {status.lastSentAt && (
             <p className="text-[10px] text-slate-400">
