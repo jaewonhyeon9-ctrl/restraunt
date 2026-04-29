@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>AutoDream — Patent Draft (English)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+        "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+      color: #1f2937;
+      line-height: 1.7;
+      max-width: 100%;
+      padding: 0;
+      margin: 0;
+      font-size: 10.5pt;
+    }
+    h1 {
+      font-size: 22pt;
+      font-weight: 800;
+      border-bottom: 3px solid #0f172a;
+      padding-bottom: 10px;
+      margin-top: 0;
+      margin-bottom: 18px;
+      color: #0f172a;
+    }
+    h2 {
+      font-size: 15pt;
+      font-weight: 700;
+      margin-top: 28px;
+      margin-bottom: 10px;
+      color: #0f172a;
+      border-left: 5px solid #0f172a;
+      padding-left: 10px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 12pt;
+      font-weight: 700;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      color: #1f2937;
+      page-break-after: avoid;
+    }
+    h4 { font-size: 11pt; margin-top: 12px; margin-bottom: 4px; }
+    p { margin: 6px 0 10px; }
+    ul, ol { margin: 6px 0 10px; padding-left: 22px; }
+    li { margin: 2px 0; }
+    code {
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      font-size: 9.5pt;
+    }
+    pre {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      overflow: auto;
+      page-break-inside: avoid;
+    }
+    pre code { background: transparent; padding: 0; font-size: 9pt; }
+    blockquote {
+      border-left: 3px solid #94a3b8;
+      padding: 6px 12px;
+      color: #475569;
+      background: #f8fafc;
+      margin: 10px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      page-break-inside: avoid;
+      font-size: 9.5pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #0f172a;
+      color: white;
+      font-weight: 600;
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+    a { color: #1d4ed8; text-decoration: none; }
+    hr {
+      border: 0;
+      border-top: 1px solid #cbd5e1;
+      margin: 22px 0;
+    }
+    .mermaid {
+      background: #fbfdff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 12px 0;
+      page-break-inside: avoid;
+      text-align: center;
+    }
+    .doc-header {
+      text-align: center;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #0f172a;
+    }
+    .doc-header .meta {
+      font-size: 9pt;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .page-break { page-break-before: always; }
+    @media print {
+      body { font-size: 10pt; }
+    }
+  </style>
+</head>
+<body>
+<h1>AutoDream — Patent Application Draft (English)</h1>
+<blockquote>
+<p>For overseas filing review (PCT, USPTO, JPO, EPO)
+Date: 2026-04-29</p>
+</blockquote>
+<hr>
+<h2>Title of Invention</h2>
+<p><strong>A PWA-based System and Method for Integrated Restaurant Sales and Inventory Management via OCR-driven Automated Data Collection and Normalization</strong></p>
+<hr>
+<h2>Field of the Invention</h2>
+<p>The present invention relates to restaurant operations management, more specifically to <strong>a Progressive Web App (PWA) system and method that automatically extracts and normalizes sales data from heterogeneous sources (receipts, POS screens, Excel/CSV files) using multimodal Large Language Models (LLMs), and integrates sales recording with automatic inventory deduction within a single transaction</strong>.</p>
+<hr>
+<h2>Background of the Invention</h2>
+<p>Restaurant owners face fragmented challenges in operational data management:</p>
+<ol>
+<li><strong>Heterogeneous POS environments</strong>: Each restaurant uses 1–3 different POS systems and 2–4 delivery apps, each with proprietary data formats.</li>
+<li><strong>Manual reconciliation</strong>: No single system unifies sales across all channels; restaurant owners spend 30–60 minutes daily on manual data entry.</li>
+<li><strong>Inventory disconnected from sales</strong>: Conventional systems store sales and inventory separately, requiring duplicate entry and causing real-time stock inaccuracy.</li>
+<li><strong>Mobile-first gap</strong>: Existing solutions assume desktop or POS-terminal access; small restaurants without POS infrastructure are underserved.</li>
+<li><strong>No diagnostic insight</strong>: Existing systems display charts/tables but require statistical literacy to interpret.</li>
+</ol>
+<hr>
+<h2>Problems Solved</h2>
+<ul>
+<li><strong>(P1)</strong> Universal compatibility regardless of POS, delivery app, or owner&#39;s IT literacy</li>
+<li><strong>(P2)</strong> Single receipt photo triggers sales registration + inventory deduction + reorder alert atomically</li>
+<li><strong>(P3)</strong> No app installation overhead — operates as PWA on standard mobile browsers</li>
+<li><strong>(P4)</strong> AI-generated natural-language diagnostic reports replacing chart-only outputs</li>
+</ul>
+<hr>
+<h2>Summary of the Invention</h2>
+<p>The invention comprises:</p>
+<ol>
+<li><strong>A multi-tier sales input fallback method</strong> providing direct entry, Excel upload, CSV upload, OCR image input, and external API integration in a unified interface;</li>
+<li><strong>A receipt OCR sales recording method</strong> using a multimodal LLM with restaurant-domain prompting to extract structured sales data (date, time, items, quantities, prices, payment) from images;</li>
+<li><strong>An automatic inventory deduction method</strong> that applies pre-registered menu-to-inventory mappings to reduce stock atomically with sales recording, within a single database transaction;</li>
+<li><strong>A self-learning menu-inventory mapping method</strong> that continuously refines mappings using text-embedding similarity and user feedback;</li>
+<li><strong>A natural-language sales report generation method</strong> that injects time-series statistics and anomaly detection results into LLM prompts to produce diagnostic Korean-language reports.</li>
+</ol>
+<hr>
+<h2>System Architecture</h2>
+<pre><code class="language-mermaid">flowchart TB
+  subgraph Client[PWA Client]
+    Cam[Camera/Receipt]
+    File[Excel/CSV]
+    Form[Direct Entry]
+    Dash[Dashboard]
+  end
+  subgraph Server[Next.js Server]
+    API[&quot;/api/sales/*&quot;]
+    Norm[Normalization]
+    OCR[OCR Engine]
+    InvSync[Inventory Sync]
+    Report[AI Report Gen]
+  end
+  subgraph DB[PostgreSQL]
+    Sales[(Sales)]
+    Inv[(Inventory)]
+    Map[(Menu-Inventory Map)]
+  end
+  subgraph LLM[Multimodal LLM]
+    Gemini[Gemini Vision]
+  end
+
+  Cam --&gt; API
+  File --&gt; API
+  Form --&gt; API
+  API --&gt; Norm
+  Norm --&gt; OCR
+  OCR --&gt; Gemini
+  Gemini --&gt; OCR
+  OCR --&gt; Norm
+  Norm --&gt; Sales
+  Sales --&gt; InvSync
+  Map --&gt; InvSync
+  InvSync --&gt; Inv
+  Sales --&gt; Report
+  Report --&gt; Dash
+  Inv --&gt; Dash
+</code></pre>
+<hr>
+<h2>Detailed Description</h2>
+<h3>1. Multi-tier Sales Input</h3>
+<p>A single user interface exposes five input pathways simultaneously:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Direct</td>
+<td>Modal form</td>
+</tr>
+<tr>
+<td>Excel</td>
+<td>File upload, automatic column detection</td>
+</tr>
+<tr>
+<td>CSV</td>
+<td>File upload via xlsx parser</td>
+</tr>
+<tr>
+<td>OCR</td>
+<td>Image upload to multimodal LLM</td>
+</tr>
+<tr>
+<td>External API</td>
+<td>POS / delivery-app integration (paid tier)</td>
+</tr>
+</tbody></table>
+<p>A <strong>column-name detection dictionary</strong> (Korean/English aliases + regex) maps user-uploaded spreadsheet columns to internal schema fields without requiring rigid templates.</p>
+<h3>2. OCR Sales Recording</h3>
+<p>Upon receiving an image, the system:</p>
+<ol>
+<li>Pre-processes (resize, rotation correction client-side)</li>
+<li>Submits to a multimodal LLM with a restaurant-domain prompt enforcing a strict JSON schema:<pre><code class="language-json">{
+  &quot;date&quot;: &quot;YYYY-MM-DD&quot; | null,
+  &quot;time&quot;: &quot;HH:MM&quot; | null,
+  &quot;items&quot;: [{&quot;name&quot;: str, &quot;qty&quot;: int, &quot;unitPrice&quot;: int}],
+  &quot;total&quot;: int | null,
+  &quot;payment&quot;: &quot;CARD&quot;|&quot;CASH&quot;|&quot;TRANSFER&quot;|&quot;OTHER&quot; | null
+}
+</code></pre>
+</li>
+<li>Validates against the schema; on partial success, pre-fills a user-correction form with extracted fields.</li>
+</ol>
+<h3>3. Atomic Sales + Inventory Transaction</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+  participant U as User
+  participant S as Server
+  participant L as LLM
+  participant T as DB Transaction
+
+  U-&gt;&gt;S: Receipt image
+  S-&gt;&gt;L: Image + extract prompt
+  L--&gt;&gt;S: Structured JSON
+  S-&gt;&gt;T: BEGIN
+  T-&gt;&gt;T: Insert Sales row
+  T-&gt;&gt;T: For each item, lookup menu-inventory map
+  T-&gt;&gt;T: Decrement Inventory.quantity
+  T-&gt;&gt;T: Insert InventoryLog
+  T-&gt;&gt;T: COMMIT
+  S-&gt;&gt;U: Confirmation + low-stock alerts
+</code></pre>
+<h3>4. Self-Learning Menu-Inventory Mapping</h3>
+<ul>
+<li>New OCR menu text → text embedding (e.g., sentence-transformer or LLM embedding API)</li>
+<li>Cosine similarity against existing menu embeddings:<ul>
+<li>≥ 0.92 → auto-map</li>
+<li>0.75–0.92 → suggest with user confirmation</li>
+<li>&lt; 0.75 → prompt for new menu registration</li>
+</ul>
+</li>
+<li>User feedback updates mapping table; system tracks Precision/Recall over time.</li>
+</ul>
+<h3>5. AI Natural-Language Reports</h3>
+<pre><code class="language-mermaid">flowchart LR
+  Sales[(Sales TS)] --&gt; Agg[Aggregation&lt;br/&gt;day/week/month/hour]
+  Agg --&gt; Anom[Anomaly Detection&lt;br/&gt;z-score, MA]
+  Anom --&gt; Pat[Pattern Extraction&lt;br/&gt;day-of-week, menu]
+  Pat --&gt; Prompt[Prompt Composer&lt;br/&gt;+ domain context]
+  Prompt --&gt; LLM
+  LLM --&gt; Report[NL Report]
+  Report --&gt; Cache[(Cache)]
+  Cache --&gt; User
+</code></pre>
+<hr>
+<h2>Claims (Draft)</h2>
+<h3>Claim 1 (Method)</h3>
+<p>A method for automatically processing restaurant operational data using OCR, comprising:
+(a) receiving, from a user terminal, an image of a receipt or POS display;
+(b) transmitting said image to a multimodal artificial-intelligence model and obtaining structured data including date, time, menu name, quantity, and amount;
+(c) extracting menu names from said structured data and referencing a pre-registered menu-to-inventory mapping dictionary;
+(d) deducting, from inventory quantities of mapped items, an amount corresponding to sold quantities;
+(e) executing steps (b) through (d) within a single database transaction.</p>
+<h3>Claim 2 (Dependent on Claim 1)</h3>
+<p>The method of Claim 1, wherein said menu-to-inventory mapping dictionary is incrementally updated by combining text-embedding similarity matching with user feedback.</p>
+<h3>Claim 3 (Method — Multi-tier Input)</h3>
+<p>A multi-tier sales data input method, comprising:
+(a) simultaneously providing, in a single user interface, four input pathways: direct entry, Excel upload, CSV upload, and image OCR input;
+(b) collecting data via path-specific adapters;
+(c) converting collected data to a unified internal schema via a normalization engine combining a column-name dictionary, regular expressions, and data-type inference;
+(d) validating converted data for duplicates, negative values, and future dates;
+(e) on validation failure, auto-populating a user-correction form with partial extraction results.</p>
+<h3>Claim 4 (System)</h3>
+<p>A restaurant sales/inventory integrated management system, comprising:</p>
+<ul>
+<li>an input module configured to receive receipt or POS images;</li>
+<li>an OCR processing module configured to communicate with a multimodal AI model and extract sales information;</li>
+<li>a normalization engine configured to convert direct entry, Excel, CSV, and OCR results into a unified schema;</li>
+<li>a storage module configured to store menu-to-inventory mappings;</li>
+<li>an inventory synchronization module configured to extract menu items from sales data and automatically deduct inventory;</li>
+<li>a notification module configured to transmit push notifications when inventory falls below a threshold;</li>
+<li>a prediction module configured to compute estimated stock-depletion dates from sales time-series.</li>
+</ul>
+<h3>Claim 5 (System — PWA)</h3>
+<p>The system of Claim 4, implemented as a Progressive Web App operating in a user terminal&#39;s web browser without requiring native app installation, with partial offline functionality enabled via service workers.</p>
+<h3>Claim 6 (Method — AI Report)</h3>
+<p>A natural-language sales report generation method based on restaurant sales data, comprising:
+(a) computing statistics on sales time-series including trend, day-of-week effects, time-of-day effects, and per-menu distributions;
+(b) identifying as anomalies deviations exceeding a threshold relative to z-score or moving-average baselines;
+(c) including computed statistics and anomalies in a prompt with restaurant-domain context, and inputting said prompt to an LLM;
+(d) caching LLM-generated natural-language text as daily/weekly/monthly reports and transmitting to user terminal.</p>
+<h3>Claim 7 (Storage Medium)</h3>
+<p>A computer-readable storage medium having recorded thereon a program for executing the method of any one of Claims 1, 3, or 6 on a computer.</p>
+<hr>
+<h2>Effects of the Invention</h2>
+<ol>
+<li>Universal data-input compatibility regardless of POS or owner IT literacy</li>
+<li>Atomic single-receipt processing of sales + inventory + alerts</li>
+<li>Zero installation friction via PWA</li>
+<li>Diagnostic AI reports actionable by non-statistical users</li>
+<li>Predictive reorder timing reduces stockouts and waste</li>
+<li>Mapping accuracy improves over time without manual maintenance</li>
+</ol>
+<hr>
+<h2>Recommended Filing Strategy</h2>
+<ul>
+<li><strong>Primary application</strong>: Combine Claims 1–4 + 7 as a unified &quot;OCR-based Restaurant Sales/Inventory Automation System and Method&quot; application.</li>
+<li><strong>Secondary application</strong>: Claim 6 (AI Natural-Language Report) as a separate filing to broaden coverage.</li>
+<li><strong>PCT consideration</strong>: File domestic Korean priority first; evaluate PCT within 12 months for global protection.</li>
+</ul>
+<hr>
+<h2>Notes for Patent Attorney</h2>
+<ul>
+<li>This document is intended as foundational material; final claim wording will be refined for jurisdictional norms (USPTO Bilski/Alice considerations for software claims, EPO technical-effect requirements, JPO software guidelines).</li>
+<li>Mermaid diagrams shown here are conceptual; final figures should be redrawn as black-and-white line drawings per filing requirements.</li>
+<li>A live demonstration is available at <a href="https://restraunt-ebon-phi.vercel.app">https://restraunt-ebon-phi.vercel.app</a> for examiner inspection if helpful.</li>
+</ul>
+
+<script>
+  // Mermaid 코드 블록을 .mermaid 컨테이너로 변환
+  document.querySelectorAll('pre code.language-mermaid').forEach((el) => {
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = el.textContent;
+    el.closest('pre').replaceWith(div);
+  });
+  mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose', flowchart: { useMaxWidth: true, htmlLabels: true } });
+  // mermaid 렌더 완료 후 print 신호
+  window.addEventListener('load', async () => {
+    try {
+      await mermaid.run();
+      window.__rendered = true;
+    } catch (e) {
+      window.__rendered = true;
+    }
+  });
+</script>
+</body>
+</html>

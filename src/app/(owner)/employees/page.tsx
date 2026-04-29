@@ -304,9 +304,9 @@ export default function EmployeesPage() {
 
       {/* 추가/수정 바텀시트 모달 */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
           <div
-            className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl max-h-[88dvh] overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+16px)] overscroll-contain"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 모달 헤더 */}

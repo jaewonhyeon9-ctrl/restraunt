@@ -33,6 +33,59 @@ model Restaurant {
   inventoryLogs    InventoryLog[]
   dailyNotes       DailyNote[]
   ocrUsages        OcrUsage[]
+  menus            Menu[]
+}
+
+// 메뉴 (판매 단위)
+model Menu {
+  id           String   @id @default(cuid())
+  restaurantId String
+  name         String
+  price        Float    // 판매가
+  category     String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  recipes    MenuRecipe[]
+  saleItems  SaleItem[]
+
+  @@index([restaurantId, isActive])
+}
+
+// 메뉴-재고 매핑 (레시피)
+// 메뉴 1개 판매 시 사용되는 재고 항목과 수량
+model MenuRecipe {
+  id              String  @id @default(cuid())
+  menuId          String
+  inventoryItemId String
+  qtyUsed         Float   // 메뉴 1개당 사용량 (재고 unit 기준)
+
+  menu          Menu          @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuId, inventoryItemId])
+  @@index([menuId])
+}
+
+// 매출 항목 (한 매출 안의 메뉴별 판매 내역, OCR로부터 추출)
+model SaleItem {
+  id        String   @id @default(cuid())
+  saleId    String
+  menuId    String?  // 매핑된 메뉴 (없으면 자유 입력)
+  rawName   String   // OCR 원문 또는 메뉴명
+  qty       Int
+  unitPrice Float
+  subtotal  Float
+  costAtSale Float?  // 판매 시점 원가 스냅샷 (원가 변동 후에도 보존)
+  createdAt DateTime @default(now())
+
+  sale Sale  @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  menu Menu? @relation(fields: [menuId], references: [id])
+
+  @@index([saleId])
+  @@index([menuId])
 }
 
 enum Plan {
@@ -235,6 +288,7 @@ model InventoryItem {
   supplier       Supplier?           @relation(fields: [supplierId], references: [id])
   inventoryLogs  InventoryLog[]
   orderItems     PurchaseOrderItem[]
+  recipes        MenuRecipe[]
 }
 
 // 재고 변동 이력
@@ -406,6 +460,7 @@ model Sale {
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   user       User       @relation(fields: [userId], references: [id])
+  items      SaleItem[]
 
   @@unique([restaurantId, saleDate])
 }

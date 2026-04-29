@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>오토드림 — 선행 기술 비교 분석</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+        "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+      color: #1f2937;
+      line-height: 1.7;
+      max-width: 100%;
+      padding: 0;
+      margin: 0;
+      font-size: 10.5pt;
+    }
+    h1 {
+      font-size: 22pt;
+      font-weight: 800;
+      border-bottom: 3px solid #0f172a;
+      padding-bottom: 10px;
+      margin-top: 0;
+      margin-bottom: 18px;
+      color: #0f172a;
+    }
+    h2 {
+      font-size: 15pt;
+      font-weight: 700;
+      margin-top: 28px;
+      margin-bottom: 10px;
+      color: #0f172a;
+      border-left: 5px solid #0f172a;
+      padding-left: 10px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 12pt;
+      font-weight: 700;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      color: #1f2937;
+      page-break-after: avoid;
+    }
+    h4 { font-size: 11pt; margin-top: 12px; margin-bottom: 4px; }
+    p { margin: 6px 0 10px; }
+    ul, ol { margin: 6px 0 10px; padding-left: 22px; }
+    li { margin: 2px 0; }
+    code {
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      font-size: 9.5pt;
+    }
+    pre {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      overflow: auto;
+      page-break-inside: avoid;
+    }
+    pre code { background: transparent; padding: 0; font-size: 9pt; }
+    blockquote {
+      border-left: 3px solid #94a3b8;
+      padding: 6px 12px;
+      color: #475569;
+      background: #f8fafc;
+      margin: 10px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      page-break-inside: avoid;
+      font-size: 9.5pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #0f172a;
+      color: white;
+      font-weight: 600;
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+    a { color: #1d4ed8; text-decoration: none; }
+    hr {
+      border: 0;
+      border-top: 1px solid #cbd5e1;
+      margin: 22px 0;
+    }
+    .mermaid {
+      background: #fbfdff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 12px 0;
+      page-break-inside: avoid;
+      text-align: center;
+    }
+    .doc-header {
+      text-align: center;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #0f172a;
+    }
+    .doc-header .meta {
+      font-size: 9pt;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .page-break { page-break-before: always; }
+    @media print {
+      body { font-size: 10pt; }
+    }
+  </style>
+</head>
+<body>
+<h1>오토드림 — 선행 기술 비교 분석</h1>
+<blockquote>
+<p>변리사 미팅 시 차별화 입증용 자료
+작성일: 2026-04-29</p>
+</blockquote>
+<hr>
+<h2>0. 비교 대상 선정 기준</h2>
+<p>본 발명과 가장 직접적으로 경쟁하는 식당 운영 SaaS / POS 부가 솔루션 / 가계부형 자동화 앱 중 한국 시장에서 점유율이 높거나, 발명 청구 영역에 인접한 사례 위주.</p>
+<hr>
+<h2>1. 핵심 기능별 비교표</h2>
+<table>
+<thead>
+<tr>
+<th>기능</th>
+<th>오토드림</th>
+<th>캐셔플</th>
+<th>페이히어</th>
+<th>더치트</th>
+<th>바로가게</th>
+<th>데일리뱅크</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>영수증 OCR 자동 매출 입력</td>
+<td><strong>✅ 멀티모달 LLM</strong></td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>△ 텍스트만</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>OCR → 재고 자동 차감</td>
+<td><strong>✅ 단일 트랜잭션</strong></td>
+<td>❌ (재고 별도)</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>다단계 폴백 입력 (직접·엑셀·CSV·OCR)</td>
+<td><strong>✅ 5-tier 동시</strong></td>
+<td>△ 직접+엑셀</td>
+<td>△ 직접+API</td>
+<td>❌</td>
+<td>❌</td>
+<td>△ 직접+CSV</td>
+</tr>
+<tr>
+<td>멀티모달 LLM 활용</td>
+<td><strong>✅</strong></td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>AI 자연어 리포트</td>
+<td><strong>✅</strong></td>
+<td>❌ (그래프만)</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>재고 발주 시점 예측</td>
+<td><strong>✅ 시계열 분해</strong></td>
+<td>△ 단순 임계값</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>메뉴-재고 매핑 자동 학습</td>
+<td><strong>✅ 임베딩+피드백</strong></td>
+<td>❌ (수동)</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>PWA 단일 코드베이스</td>
+<td><strong>✅</strong></td>
+<td>❌ (네이티브)</td>
+<td>❌ (네이티브)</td>
+<td>❌ (네이티브)</td>
+<td>❌ (Electron)</td>
+<td>△ (앱)</td>
+</tr>
+<tr>
+<td>별도 단말 / POS 의존</td>
+<td><strong>❌ (휴대폰만)</strong></td>
+<td>✅ (POS 단말 필요)</td>
+<td>✅ (POS 필요)</td>
+<td>❌</td>
+<td>✅</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>다중 매장 동기화</td>
+<td><strong>✅</strong></td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>✅ (유료)</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>무료 사용 가능</td>
+<td><strong>✅ (전 기능)</strong></td>
+<td>❌ (월 22,000원~)</td>
+<td>❌ (월 27,000원~)</td>
+<td>✅ (제한)</td>
+<td>❌ (월 33,000원~)</td>
+<td>✅ (광고)</td>
+</tr>
+</tbody></table>
+<p><strong>범례</strong>: ✅ 완전 지원 / △ 부분 지원 / ❌ 미지원</p>
+<hr>
+<h2>2. 영역별 차별화 포인트 분석</h2>
+<h3>2.1 OCR 매출 자동 입력</h3>
+<ul>
+<li><strong>종래 솔루션 한계</strong>:<ul>
+<li>캐셔플/페이히어: 매출은 POS 연동에만 의존. POS와 직접 연동되지 않으면 수기 입력</li>
+<li>바로가게: OCR 있으나 단순 텍스트 추출, 메뉴/금액 구조화 안 됨</li>
+<li>더치트: 가계부 형태로만 작동, 식당 도메인 특화 없음</li>
+</ul>
+</li>
+<li><strong>오토드림 차별점</strong>:<ul>
+<li>멀티모달 LLM이 한국 영수증/POS 화면을 도메인 컨텍스트와 함께 처리 → 인식률 90%+</li>
+<li>JSON 스키마 강제 출력으로 후속 시스템 연결 안정성</li>
+<li>부분 인식 결과를 수정 폼에 자동 채움 → 사용자 보정 시간 단축</li>
+</ul>
+</li>
+</ul>
+<h3>2.2 OCR → 재고 자동 차감</h3>
+<ul>
+<li><strong>종래 솔루션 한계</strong>:<ul>
+<li>매출 시스템과 재고 시스템이 분리됨. 사용자가 매출 입력 후 별도로 재고 차감 입력 필요</li>
+<li>일부 ERP는 매출-재고 연동 있으나 POS 직접 통신만 지원, OCR 기반 없음</li>
+</ul>
+</li>
+<li><strong>오토드림 차별점</strong>:<ul>
+<li>영수증 사진 1장 → 매출 등록 + 재고 차감 + 알림이 단일 트랜잭션</li>
+<li>메뉴-재고 매핑 학습으로 시간이 갈수록 자동화율 상승</li>
+</ul>
+</li>
+</ul>
+<h3>2.3 다단계 폴백 입력</h3>
+<ul>
+<li><strong>종래 솔루션 한계</strong>:<ul>
+<li>POS 직접 연동에 의존 → POS 미사용 식당, 다중 매출 채널(매장+배달앱+오프라인) 식당은 불완전</li>
+<li>엑셀 업로드만 제공하는 솔루션은 컬럼 형식이 고정되어 사용자가 매번 양식 맞춰야 함</li>
+</ul>
+</li>
+<li><strong>오토드림 차별점</strong>:<ul>
+<li>단일 화면에 5가지 입력 경로가 동시 노출</li>
+<li>컬럼명 자동 감지(한국어/영어/속어 사전) → 양식 강제 없음</li>
+<li>POS 미사용 식당, 배달앱 매출, 오프라인 매출 모두 처리 가능</li>
+</ul>
+</li>
+</ul>
+<h3>2.4 AI 자연어 리포트</h3>
+<ul>
+<li><strong>종래 솔루션 한계</strong>:<ul>
+<li>그래프/표만 제공. &quot;왜 어제 매출이 떨어졌는지&quot; 같은 진단형 텍스트 없음</li>
+<li>식당주는 통계 해석 능력이 제각각 → 데이터가 있어도 활용 못 함</li>
+</ul>
+</li>
+<li><strong>오토드림 차별점</strong>:<ul>
+<li>통계 + 도메인 컨텍스트를 LLM에 주입 → 자연어 진단 + 권장 행동</li>
+<li>캐시 전략으로 비용 절감</li>
+</ul>
+</li>
+</ul>
+<h3>2.5 PWA 단일 코드베이스</h3>
+<ul>
+<li><strong>종래 솔루션 한계</strong>:<ul>
+<li>네이티브 앱(iOS/Android 별도) — 개발/유지보수 비용 큼, 출시 심사 필요</li>
+<li>데스크톱 SW — 식당 내 단말에 묶임, 외부 이동 불가</li>
+</ul>
+</li>
+<li><strong>오토드림 차별점</strong>:<ul>
+<li>단일 PWA로 iOS/Android/데스크톱 모두 지원</li>
+<li>앱스토어 등록 없이 URL로 즉시 사용</li>
+<li>서비스 워커로 일부 오프라인 가능</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2>3. 특허 등록 가능성 평가 (자체 추정)</h2>
+<table>
+<thead>
+<tr>
+<th>청구 후보</th>
+<th>신규성</th>
+<th>진보성</th>
+<th>등록 가능성</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>① 다단계 폴백 매출 입력 (4-tier)</td>
+<td>중</td>
+<td>중</td>
+<td>△ 청구항 좁히면 가능</td>
+</tr>
+<tr>
+<td>② OCR 매출 자동 입력 (멀티모달 LLM)</td>
+<td>상</td>
+<td>상</td>
+<td><strong>✅ 매우 유망</strong></td>
+</tr>
+<tr>
+<td>③ OCR → 재고 자동 차감 (단일 트랜잭션)</td>
+<td>상</td>
+<td>상</td>
+<td><strong>✅ 매우 유망</strong></td>
+</tr>
+<tr>
+<td>④ 메뉴-재고 매핑 자동 학습</td>
+<td>상</td>
+<td>중상</td>
+<td><strong>✅ 유망</strong></td>
+</tr>
+<tr>
+<td>⑤ 이종 데이터 정규화 엔진</td>
+<td>중</td>
+<td>중</td>
+<td>△ 좁혀서 출원</td>
+</tr>
+<tr>
+<td>⑥ PWA 통합 운영 시스템</td>
+<td>하</td>
+<td>중</td>
+<td>△ 다른 청구와 결합 시</td>
+</tr>
+<tr>
+<td>⑦ AI 자연어 리포트 자동 생성</td>
+<td>중상</td>
+<td>상</td>
+<td><strong>✅ 유망</strong></td>
+</tr>
+<tr>
+<td>⑧ 재고 발주 시점 예측</td>
+<td>중</td>
+<td>중상</td>
+<td>△ 좁혀서 출원</td>
+</tr>
+</tbody></table>
+<p><strong>전략 제안</strong>:</p>
+<ul>
+<li><strong>묶음 출원 1건</strong> — ② + ③ + ④를 결합한 &quot;OCR 기반 식당 매출·재고 자동화 시스템&quot;으로 하나</li>
+<li><strong>별도 출원 1건</strong> — ⑦ &quot;AI 자연어 식당 리포트 생성 방법&quot;</li>
+<li>나머지(①·⑤·⑥·⑧)는 첫 출원 명세서 본문에 포함시키되 청구항으로는 요약 형태만</li>
+</ul>
+<hr>
+<h2>4. 선행 기술 검색 키워드 (변리사 의뢰용)</h2>
+<h3>한국 KIPRIS 검색 키워드</h3>
+<ul>
+<li><code>식당 매출 OCR</code></li>
+<li><code>영수증 자동 인식 재고</code></li>
+<li><code>멀티모달 인공지능 매출</code></li>
+<li><code>POS 화면 캡처 매출 자동</code></li>
+<li><code>메뉴 재고 자동 차감</code></li>
+<li><code>영수증 인공지능 가계부</code></li>
+<li><code>식당 운영 PWA</code></li>
+</ul>
+<h3>영문 키워드 (해외 출원 검토 시)</h3>
+<ul>
+<li><code>restaurant sales OCR</code></li>
+<li><code>receipt parsing inventory deduction</code></li>
+<li><code>multimodal LLM receipt extraction</code></li>
+<li><code>POS screen capture auto sales</code></li>
+<li><code>menu inventory mapping learning</code></li>
+</ul>
+<h3>분류 코드 (IPC)</h3>
+<ul>
+<li>G06Q 50/12 (호텔, 식당 등의 운영)</li>
+<li>G06Q 30/04 (회계 / 청구)</li>
+<li>G06V 30/41 (문서 분석)</li>
+<li>G06N 3/0464 (멀티모달 신경망)</li>
+<li>G06F 16/35 (텍스트 분류)</li>
+</ul>
+<hr>
+<h2>5. 차별화 입증을 위한 데모 시나리오</h2>
+<p>변리사에게 보여줄 라이브 데모 흐름:</p>
+<ol>
+<li><strong>캐셔플 / 페이히어</strong> 화면 비교<ul>
+<li>&quot;이 솔루션은 매출 입력하려면 POS 단말 필요&quot; → 한계 시연</li>
+</ul>
+</li>
+<li><strong>오토드림</strong> 라이브 데모<ul>
+<li>영수증 사진 1장 → 매출 등록 + 재고 차감 + 알림 → 30초 내 완료 시연</li>
+<li>엑셀 파일을 그대로 끌어다 놓기 → 컬럼 자동 감지 시연</li>
+<li>&quot;이번 달 매출 분석&quot; 클릭 → AI 자연어 리포트 자동 생성 시연</li>
+</ul>
+</li>
+<li><strong>사용자 환경 다양성</strong> 시연<ul>
+<li>POS 없는 푸드트럭주</li>
+<li>POS + 배달앱 3개 병용 식당</li>
+<li>영수증만 있는 노점</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>6. 결론</h2>
+<p>오토드림의 핵심 발명은 **&quot;이종 매출 데이터를 멀티모달 AI로 정규화하여 단일 트랜잭션으로 매출+재고를 동시에 처리하는 메커니즘&quot;**이며, 이는 한국 식당 운영 SaaS 시장에서 <strong>선행 기술이 거의 없는 영역</strong>으로 판단됨.</p>
+<p>특히 ②·③·④의 결합은 종래 기술 대비 명확한 진보성과 효과를 가지므로 <strong>묶음 출원 1건의 핵심 청구항으로 강력 추천</strong>.</p>
+<p>⑦ AI 자연어 리포트는 별도 출원으로 분리해 권리 범위를 넓히는 전략이 유리.</p>
+
+<script>
+  // Mermaid 코드 블록을 .mermaid 컨테이너로 변환
+  document.querySelectorAll('pre code.language-mermaid').forEach((el) => {
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = el.textContent;
+    el.closest('pre').replaceWith(div);
+  });
+  mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose', flowchart: { useMaxWidth: true, htmlLabels: true } });
+  // mermaid 렌더 완료 후 print 신호
+  window.addEventListener('load', async () => {
+    try {
+      await mermaid.run();
+      window.__rendered = true;
+    } catch (e) {
+      window.__rendered = true;
+    }
+  });
+</script>
+</body>
+</html>

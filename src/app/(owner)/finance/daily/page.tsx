@@ -574,8 +574,8 @@ export default function DailyFinancePage() {
 
       {/* 매출 입력 모달 */}
       {showSaleModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-          <div className="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
+          <div className="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4 max-h-[88dvh] overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+24px)] overscroll-contain">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-900">매출 {sale ? '수정' : '입력'}</h3>
               <button onClick={() => setShowSaleModal(false)} className="p-1 text-gray-400">
@@ -673,8 +673,8 @@ export default function DailyFinancePage() {
 
       {/* POS/배달앱 매출 업로드 모달 */}
       {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-          <div className="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
+          <div className="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4 max-h-[88dvh] overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+24px)] overscroll-contain">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-900">매출 엑셀/CSV 업로드</h3>
               <button

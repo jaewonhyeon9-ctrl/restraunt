@@ -266,8 +266,8 @@ export default function OwnerInventoryPage() {
 
       {/* 품목 추가 모달 */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-          <div className="w-full max-w-md bg-white rounded-t-2xl p-5 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
+          <div className="w-full max-w-md bg-white rounded-t-2xl p-5 shadow-2xl max-h-[88dvh] overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+16px)] overscroll-contain">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">재고 품목 추가</h2>
               <button

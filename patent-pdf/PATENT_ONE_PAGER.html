@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>오토드림 — 1페이지 요약</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+        "Pretendard Variable", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+      color: #1f2937;
+      line-height: 1.7;
+      max-width: 100%;
+      padding: 0;
+      margin: 0;
+      font-size: 10.5pt;
+    }
+    h1 {
+      font-size: 22pt;
+      font-weight: 800;
+      border-bottom: 3px solid #0f172a;
+      padding-bottom: 10px;
+      margin-top: 0;
+      margin-bottom: 18px;
+      color: #0f172a;
+    }
+    h2 {
+      font-size: 15pt;
+      font-weight: 700;
+      margin-top: 28px;
+      margin-bottom: 10px;
+      color: #0f172a;
+      border-left: 5px solid #0f172a;
+      padding-left: 10px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 12pt;
+      font-weight: 700;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      color: #1f2937;
+      page-break-after: avoid;
+    }
+    h4 { font-size: 11pt; margin-top: 12px; margin-bottom: 4px; }
+    p { margin: 6px 0 10px; }
+    ul, ol { margin: 6px 0 10px; padding-left: 22px; }
+    li { margin: 2px 0; }
+    code {
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      font-size: 9.5pt;
+    }
+    pre {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      overflow: auto;
+      page-break-inside: avoid;
+    }
+    pre code { background: transparent; padding: 0; font-size: 9pt; }
+    blockquote {
+      border-left: 3px solid #94a3b8;
+      padding: 6px 12px;
+      color: #475569;
+      background: #f8fafc;
+      margin: 10px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      page-break-inside: avoid;
+      font-size: 9.5pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #0f172a;
+      color: white;
+      font-weight: 600;
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+    a { color: #1d4ed8; text-decoration: none; }
+    hr {
+      border: 0;
+      border-top: 1px solid #cbd5e1;
+      margin: 22px 0;
+    }
+    .mermaid {
+      background: #fbfdff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 12px 0;
+      page-break-inside: avoid;
+      text-align: center;
+    }
+    .doc-header {
+      text-align: center;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #0f172a;
+    }
+    .doc-header .meta {
+      font-size: 9pt;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .page-break { page-break-before: always; }
+    @media print {
+      body { font-size: 10pt; }
+    }
+  </style>
+</head>
+<body>
+<h1>오토드림 — 특허 출원 1페이지 요약</h1>
+<blockquote>
+<p>변리사 / 투자자 / 의사결정자용 / A4 1매</p>
+</blockquote>
+<hr>
+<h2>발명 명칭</h2>
+<p><strong>식당 운영 데이터를 OCR 기반으로 자동 수집·정규화하여 매출 및 재고를 통합 관리하는 PWA 시스템 및 그 방법</strong></p>
+<h2>한 문장 정의</h2>
+<p>영수증 한 장만 찍으면 매출 등록 + 재고 자동 차감 + 발주 알림이 동시에 처리되는, 한국 식당 환경(POS 다양성·영세 IT 환경)에 특화된 PWA 솔루션.</p>
+<hr>
+<h2>핵심 청구 요약 (Top 3)</h2>
+<p><strong>① OCR 기반 식당 매출·재고 자동화 시스템 (메인 청구)</strong></p>
+<ul>
+<li>멀티모달 LLM이 영수증/POS 화면에서 메뉴·수량·금액을 구조화 JSON으로 추출</li>
+<li>메뉴-재고 매핑 사전을 참조해 단일 트랜잭션으로 매출+재고+로그 동시 처리</li>
+<li>차별점: 매출-재고 분리 운영하는 종래 시스템 대비 <strong>시간 70%↓, 인적 오류 90%↓</strong></li>
+</ul>
+<p><strong>② 다단계 폴백 매출 입력 방법</strong></p>
+<ul>
+<li>단일 화면에서 직접/엑셀/CSV/OCR/외부 API의 5가지 입력 경로 동시 제공</li>
+<li>컬럼명 자동 감지(한국어/영어 사전) + 데이터 타입 추론</li>
+<li>차별점: POS 종류·식당주 IT 숙련도와 <strong>무관하게 100% 입력 가능</strong></li>
+</ul>
+<p><strong>③ AI 매출 자연어 리포트 자동 생성 방법</strong></p>
+<ul>
+<li>시계열 통계 + 이상치 탐지 + 도메인 컨텍스트 → LLM 진단형 리포트</li>
+<li>&quot;왜 어제 매출이 떨어졌는지&quot; 같은 자연어 분석</li>
+<li>차별점: 그래프만 제공하는 종래 SaaS 대비 <strong>의사결정 즉시 활용 가능</strong></li>
+</ul>
+<hr>
+<h2>종래 기술 대비 핵심 차별점</h2>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>종래 (캐셔플/페이히어 등)</th>
+<th>오토드림</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>매출 입력</td>
+<td>POS 단말 직접 연동만</td>
+<td><strong>5가지 경로 동시</strong></td>
+</tr>
+<tr>
+<td>영수증 OCR</td>
+<td>미지원 또는 텍스트만</td>
+<td><strong>멀티모달 LLM 구조화 추출</strong></td>
+</tr>
+<tr>
+<td>재고 차감</td>
+<td>매출과 분리, 별도 입력</td>
+<td><strong>단일 트랜잭션 자동</strong></td>
+</tr>
+<tr>
+<td>단말</td>
+<td>POS 단말 + 데스크톱</td>
+<td><strong>휴대폰 PWA만</strong></td>
+</tr>
+<tr>
+<td>AI 리포트</td>
+<td>없음 (그래프만)</td>
+<td><strong>자연어 진단형</strong></td>
+</tr>
+<tr>
+<td>비용</td>
+<td>월 22,000~33,000원</td>
+<td><strong>무료 (전 기능)</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>등록 가능성 (자체 평가)</h2>
+<ul>
+<li><strong>매우 유망</strong>: ② OCR 매출 자동 입력 + ③ OCR→재고 차감 + ④ 메뉴-재고 매핑 학습 → <strong>묶음 출원 1건</strong></li>
+<li><strong>유망</strong>: ⑦ AI 자연어 리포트 → <strong>별도 출원 1건</strong></li>
+<li>나머지: 명세서 본문에 포함</li>
+</ul>
+<h2>출원 전략</h2>
+<ol>
+<li>변리사 1차 미팅 (이 문서 + PATENT_DRAFT.md + 라이브 데모)</li>
+<li>KIPRIS 선행 기술 조사 (1~2주)</li>
+<li>명세서 정식 작성</li>
+<li>출원 → 심사 청구 → 등록 (1~3년)</li>
+</ol>
+<hr>
+<h2>라이브 데모</h2>
+<ul>
+<li><strong>URL</strong>: <a href="https://restraunt-ebon-phi.vercel.app">https://restraunt-ebon-phi.vercel.app</a></li>
+<li><strong>시연 흐름</strong>: 영수증 사진 1장 → 30초 내 매출+재고+알림 자동 처리 확인</li>
+</ul>
+<h2>핵심 기술 스택</h2>
+<ul>
+<li><strong>Front</strong>: Next.js 16 + Tailwind v4 + PWA (Service Worker)</li>
+<li><strong>Back</strong>: Next.js Route Handlers (Vercel Edge/Serverless)</li>
+<li><strong>DB</strong>: PostgreSQL (Supabase) + Prisma ORM</li>
+<li><strong>AI</strong>: Gemini 2.5 Flash Vision (멀티모달 LLM)</li>
+<li><strong>Auth</strong>: NextAuth v5</li>
+</ul>
+<hr>
+<h2>첨부 자료</h2>
+<ul>
+<li><code>PATENT_DRAFT.md</code> — 정식 명세서 초안 (8개 청구 후보 + 도면)</li>
+<li><code>PATENT_PRIOR_ART.md</code> — 선행 기술 비교 분석</li>
+<li><code>PATENT_DRAFT_EN.md</code> — 해외 출원 검토용 영문 초안</li>
+</ul>
+
+<script>
+  // Mermaid 코드 블록을 .mermaid 컨테이너로 변환
+  document.querySelectorAll('pre code.language-mermaid').forEach((el) => {
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = el.textContent;
+    el.closest('pre').replaceWith(div);
+  });
+  mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose', flowchart: { useMaxWidth: true, htmlLabels: true } });
+  // mermaid 렌더 완료 후 print 신호
+  window.addEventListener('load', async () => {
+    try {
+      await mermaid.run();
+      window.__rendered = true;
+    } catch (e) {
+      window.__rendered = true;
+    }
+  });
+</script>
+</body>
+</html>

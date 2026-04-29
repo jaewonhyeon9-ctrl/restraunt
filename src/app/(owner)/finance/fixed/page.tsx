@@ -295,8 +295,8 @@ export default function FixedExpensePage() {
 
       {/* 등록/수정 모달 */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-          <div className="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
+          <div className="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4 max-h-[88dvh] overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+24px)] overscroll-contain">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-900">
                 고정비용 {editingId ? '수정' : '등록'}
