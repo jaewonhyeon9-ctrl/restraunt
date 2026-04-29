@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import CalendarSalesOcr from '@/components/owner/CalendarSalesOcr'
 
 interface ExpenseItem {
   id: string
@@ -107,6 +108,7 @@ export default function DailyFinancePage() {
 
   // 엑셀/CSV 업로드
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showCalendarOcr, setShowCalendarOcr] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadSource, setUploadSource] = useState<'AUTO' | 'POS' | 'BAEMIN' | 'COUPANG_EATS' | 'YOGIYO'>('AUTO')
   const [uploadReplaceExisting, setUploadReplaceExisting] = useState(false)
@@ -364,6 +366,12 @@ export default function DailyFinancePage() {
             📥 POS
           </button>
           <button
+            onClick={() => setShowCalendarOcr(true)}
+            className="bg-white border border-purple-300 text-purple-600 text-xs font-semibold px-3 py-1.5 rounded-lg"
+          >
+            📅 달력
+          </button>
+          <button
             onClick={openSaleModal}
             className="bg-orange-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
           >
@@ -371,6 +379,8 @@ export default function DailyFinancePage() {
           </button>
         </div>
       </div>
+
+      {showCalendarOcr && <CalendarSalesOcr onClose={() => setShowCalendarOcr(false)} />}
 
       <div className="max-w-md mx-auto px-4 py-4 space-y-4">
         {/* 날짜 선택 */}

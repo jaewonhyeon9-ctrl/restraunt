@@ -237,6 +237,7 @@ export function RestaurantSwitcher() {
                   <LocationPicker
                     initialLat={null}
                     initialLng={null}
+                    height="200px"
                     onChange={(lat, lng) => {
                       setNewLat(lat)
                       setNewLng(lng)
