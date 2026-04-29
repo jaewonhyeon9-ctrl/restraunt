@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 const bodySchema = z.object({
   name: z.string().min(1).max(60),
   address: z.string().max(120).nullish(),
+  lat: z.number().min(-90).max(90).nullish(),
+  lng: z.number().min(-180).max(180).nullish(),
 })
 
 /** 새 매장 생성 — 현재 사용자가 자동으로 OWNER + 활성 매장으로 전환 */
@@ -36,6 +38,8 @@ export async function POST(req: NextRequest) {
       data: {
         name: parsed.data.name.trim(),
         address: parsed.data.address?.trim() || null,
+        lat: parsed.data.lat ?? null,
+        lng: parsed.data.lng ?? null,
         plan: 'FREE',
       },
     })

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { LocationPicker } from './LocationPicker'
 
 type Restaurant = {
   id: string
@@ -23,6 +24,8 @@ export function RestaurantSwitcher() {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newAddress, setNewAddress] = useState('')
+  const [newLat, setNewLat] = useState<number | null>(null)
+  const [newLng, setNewLng] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -82,7 +85,12 @@ export function RestaurantSwitcher() {
       const res = await fetch('/api/restaurants/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), address: newAddress.trim() || null }),
+        body: JSON.stringify({
+          name: newName.trim(),
+          address: newAddress.trim() || null,
+          lat: newLat,
+          lng: newLng,
+        }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -94,6 +102,8 @@ export function RestaurantSwitcher() {
       await update()
       setNewName('')
       setNewAddress('')
+      setNewLat(null)
+      setNewLng(null)
       setCreating(false)
       setOpen(false)
       router.refresh()
@@ -222,6 +232,17 @@ export function RestaurantSwitcher() {
                   placeholder="주소 (선택)"
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
                 />
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-700 mb-1">📍 매장 위치 (지도 클릭)</p>
+                  <LocationPicker
+                    initialLat={null}
+                    initialLng={null}
+                    onChange={(lat, lng) => {
+                      setNewLat(lat)
+                      setNewLng(lng)
+                    }}
+                  />
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
