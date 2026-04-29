@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   if (!user?.id) {
     return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
   }
-  if (user.role !== 'OWNER') {
+  if (user.role !== 'OWNER' && user.role !== 'MANAGER') {
     return NextResponse.json({ error: '사장 권한이 필요합니다.' }, { status: 403 })
   }
   if (!user.restaurantId) {

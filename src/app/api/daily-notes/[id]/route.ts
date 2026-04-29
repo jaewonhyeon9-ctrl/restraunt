@@ -25,7 +25,7 @@ export async function DELETE(
       { status: 404 }
     )
   }
-  if (user.role !== 'OWNER' && note.userId !== user.id) {
+  if (user.role !== 'OWNER' && user.role !== 'MANAGER' && note.userId !== user.id) {
     return NextResponse.json(
       { error: '본인이 작성한 메모만 삭제할 수 있습니다.' },
       { status: 403 }

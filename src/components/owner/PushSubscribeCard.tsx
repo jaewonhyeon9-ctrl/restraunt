@@ -113,8 +113,30 @@ export default function PushSubscribeCard() {
       {state === 'subscribed' && (
         <>
           <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-2 text-[11px] text-emerald-200">
-            ✓ 활성화 — 매일 23시 AI 점장 리포트가 도착합니다
+            ✓ 활성화 — 매일 22시 AI 점장 리포트가 도착합니다
           </div>
+          <button
+            type="button"
+            onClick={async () => {
+              setPending(true)
+              setError(null)
+              try {
+                const res = await fetch('/api/push/test', { method: 'POST' })
+                const body = await res.json().catch(() => ({}))
+                if (!res.ok) throw new Error(body.error ?? '발송 실패')
+                if (body.sent === 0)
+                  throw new Error('전송된 디바이스 없음 — 알림을 다시 켜주세요')
+              } catch (e) {
+                setError(e instanceof Error ? e.message : '테스트 실패')
+              } finally {
+                setPending(false)
+              }
+            }}
+            disabled={pending}
+            className="w-full rounded-lg bg-slate-700 hover:bg-slate-600 py-2 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {pending ? '전송 중…' : '🔔 테스트 알림 보내기'}
+          </button>
           <button
             type="button"
             onClick={unsubscribe}

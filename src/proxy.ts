@@ -1,10 +1,12 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
-// 사장 전용 경로
-const OWNER_ONLY = ['/dashboard', '/finance', '/suppliers', '/employees', '/checklist-admin']
-// 직원 전용 경로
-const EMPLOYEE_ONLY = ['/home', '/checklist', '/profile', '/inventory/check', '/inventory/order']
+// 사장 + 점장 접근 가능 경로
+const OWNER_AREA = ['/dashboard', '/finance', '/suppliers', '/employees', '/checklist-admin']
+
+function isOwnerLevel(role?: string): boolean {
+  return role === 'OWNER' || role === 'MANAGER'
+}
 
 export const proxy = auth((req) => {
   const { pathname } = req.nextUrl
@@ -32,20 +34,17 @@ export const proxy = auth((req) => {
 
     // 로그인 상태에서 /login, /signup, 루트 접근 시 역할별 홈으로
     if (pathname === '/login' || pathname === '/signup' || pathname === '/') {
-      return NextResponse.redirect(new URL(role === 'OWNER' ? '/dashboard' : '/home', req.url))
+      return NextResponse.redirect(new URL(isOwnerLevel(role) ? '/dashboard' : '/home', req.url))
     }
 
-    // 직원이 사장 전용 페이지 접근 시
+    // 사장/점장 외 직급이 사장 영역 접근 시 → 직원 화면으로
     const isOwnerPath =
-      OWNER_ONLY.some((p) => pathname === p || pathname.startsWith(p + '/')) ||
+      OWNER_AREA.some((p) => pathname === p || pathname.startsWith(p + '/')) ||
       pathname === '/inventory' ||
       pathname.startsWith('/inventory/orders')
-    if (role === 'EMPLOYEE' && isOwnerPath) {
+    if (!isOwnerLevel(role) && isOwnerPath) {
       return NextResponse.redirect(new URL('/home', req.url))
     }
-
-    // 사장은 직원 전용 페이지도 미리보기 가능 (관리 목적)
-    // EMPLOYEE_ONLY 경로 접근 차단 안 함
   }
 
   return NextResponse.next()

@@ -11,7 +11,7 @@ async function requireOwner() {
     | { id?: string; role?: string; restaurantId?: string }
     | undefined
   if (!user?.id) return { error: '로그인이 필요합니다.', status: 401 as const }
-  if (user.role !== 'OWNER')
+  if (user.role !== 'OWNER' && user.role !== 'MANAGER')
     return { error: '사장 권한이 필요합니다.', status: 403 as const }
   if (!user.restaurantId)
     return { error: '사업장 정보가 없습니다.', status: 400 as const }

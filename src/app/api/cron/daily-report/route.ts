@@ -6,7 +6,7 @@ import { buildKakaoSummary } from '@/lib/report-formatter'
 import { generateAiManagerReport } from '@/lib/ai-manager'
 import { sendPushToUser } from '@/lib/push'
 
-const PUSH_DEFAULT_HOUR = 23 // 푸시는 23시 KST 고정 발송
+const PUSH_DEFAULT_HOUR = 22 // 푸시는 22시 KST 고정 발송
 
 /**
  * Vercel Cron (매시 정각에 실행 권장):

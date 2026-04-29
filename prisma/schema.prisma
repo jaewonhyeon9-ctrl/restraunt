@@ -192,8 +192,11 @@ model KakaoIntegration {
 }
 
 enum Role {
-  OWNER
-  EMPLOYEE
+  OWNER       // 사장 - 매장 소유주, 일일 리포트 수신
+  MANAGER     // 점장 - 사장과 동일 권한 (단 일일 리포트는 사장만)
+  DEPUTY      // 대리 - 영수증 OCR + 기본 직원 권한
+  STAFF       // 사원 - 기본 직원 권한
+  EMPLOYEE    // (deprecated 호환용) UI에선 STAFF로 표시
 }
 
 // 출퇴근 기록
