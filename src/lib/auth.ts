@@ -10,12 +10,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: '/login',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id
         token.role = (user as any).role
         token.restaurantId = (user as any).restaurantId
+        token.activeRestaurantId =
+          (user as any).activeRestaurantId ?? (user as any).restaurantId
         token.name = user.name
+      }
+      // 매장 전환 시 토큰 리프레시 — session.update() 호출하면 트리거됨
+      if (trigger === 'update' && token.id) {
+        const u = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { activeRestaurantId: true, role: true },
+        })
+        if (u) {
+          token.activeRestaurantId = u.activeRestaurantId ?? token.restaurantId
+        }
       }
       return token
     },
@@ -24,6 +36,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string
         ;(session.user as any).role = token.role
         ;(session.user as any).restaurantId = token.restaurantId
+        ;(session.user as any).activeRestaurantId =
+          token.activeRestaurantId ?? token.restaurantId
       }
       return session
     },
@@ -57,6 +71,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           restaurantId: user.restaurantId,
+          activeRestaurantId: user.activeRestaurantId ?? user.restaurantId,
         }
       },
     }),

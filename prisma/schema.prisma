@@ -34,6 +34,7 @@ model Restaurant {
   dailyNotes       DailyNote[]
   ocrUsages        OcrUsage[]
   menus            Menu[]
+  members          UserRestaurant[] @relation("RestaurantMembers")
 }
 
 // 메뉴 (판매 단위)
@@ -109,33 +110,52 @@ model OcrUsage {
   @@index([restaurantId])
 }
 
+// 사용자-매장 다대다 연결 (다점포 사장/매니저 지원)
+model UserRestaurant {
+  id           String   @id @default(cuid())
+  userId       String
+  restaurantId String
+  role         Role     @default(OWNER)
+  isPrimary    Boolean  @default(false)  // 주 매장 (가입 시 자동 매장)
+  joinedAt     DateTime @default(now())
+
+  user       User       @relation("UserAccessRestaurants", fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation("RestaurantMembers", fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, restaurantId])
+  @@index([userId])
+  @@index([restaurantId])
+}
+
 // 사용자 (사장 + 직원)
 model User {
-  id            String     @id @default(cuid())
-  restaurantId  String
-  email         String     @unique
-  passwordHash  String
-  name          String
-  role          Role       @default(EMPLOYEE)
-  phone         String?
-  hourlyWage    Float?
-  monthlyWage   Float?
-  hireDate      DateTime?
-  isActive      Boolean    @default(true)
-  createdAt     DateTime   @default(now())
+  id                 String     @id @default(cuid())
+  restaurantId       String     // 주 매장 (가입 시점)
+  activeRestaurantId String?    // 현재 작업 중인 매장 (다점포 사장이 전환 가능)
+  email              String     @unique
+  passwordHash       String
+  name               String
+  role               Role       @default(EMPLOYEE)
+  phone              String?
+  hourlyWage         Float?
+  monthlyWage        Float?
+  hireDate           DateTime?
+  isActive           Boolean    @default(true)
+  createdAt          DateTime   @default(now())
 
-  restaurant       Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  attendance       Attendance[]
-  checklistLogs    ChecklistLog[]
-  requestedOrders  PurchaseOrder[] @relation("RequestedBy")
-  approvedOrders   PurchaseOrder[] @relation("ApprovedBy")
-  receiptImages    ReceiptImage[]
-  expenses         Expense[]
-  sales            Sale[]
-  inventoryLogs    InventoryLog[]
-  notifications    Notification[]
-  dailyNotes       DailyNote[]
-  kakaoIntegration KakaoIntegration?
+  restaurant         Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  attendance         Attendance[]
+  checklistLogs      ChecklistLog[]
+  requestedOrders    PurchaseOrder[]  @relation("RequestedBy")
+  approvedOrders     PurchaseOrder[]  @relation("ApprovedBy")
+  receiptImages      ReceiptImage[]
+  expenses           Expense[]
+  sales              Sale[]
+  inventoryLogs      InventoryLog[]
+  notifications      Notification[]
+  dailyNotes         DailyNote[]
+  kakaoIntegration   KakaoIntegration?
+  restaurantAccess   UserRestaurant[] @relation("UserAccessRestaurants")
 }
 
 // 카카오톡 연동 (나에게 보내기 자동 발송)
