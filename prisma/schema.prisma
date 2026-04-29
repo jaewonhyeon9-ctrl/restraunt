@@ -156,6 +156,22 @@ model User {
   dailyNotes         DailyNote[]
   kakaoIntegration   KakaoIntegration?
   restaurantAccess   UserRestaurant[] @relation("UserAccessRestaurants")
+  pushSubscriptions  PushSubscription[]
+}
+
+// PWA Web Push 구독
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  authKey   String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // 카카오톡 연동 (나에게 보내기 자동 발송)

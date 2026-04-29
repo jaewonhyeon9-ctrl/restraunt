@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { getValidAccessToken, sendToSelf } from '@/lib/kakao'
 import { buildDailySummary } from '@/lib/daily-report'
 import { buildKakaoSummary } from '@/lib/report-formatter'
+import { generateAiManagerReport } from '@/lib/ai-manager'
+import { sendPushToUser } from '@/lib/push'
+
+const PUSH_DEFAULT_HOUR = 23 // 푸시는 23시 KST 고정 발송
 
 /**
  * Vercel Cron (매시 정각에 실행 권장):
@@ -115,10 +119,61 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // === Web Push 발송 (PWA 알림, 23시 KST 고정) ===
+  let pushSent = 0
+  let pushSkipped = 0
+  if (hour === PUSH_DEFAULT_HOUR) {
+    const pushOwners = await prisma.user.findMany({
+      where: {
+        role: 'OWNER',
+        pushSubscriptions: { some: {} },
+      },
+      select: { id: true, name: true, restaurantId: true, activeRestaurantId: true },
+    })
+
+    const origin = new URL(req.url).origin
+
+    for (const owner of pushOwners) {
+      const restaurantId = owner.activeRestaurantId ?? owner.restaurantId
+      if (!restaurantId) {
+        pushSkipped++
+        continue
+      }
+      try {
+        const summary = await buildDailySummary(restaurantId, today)
+        if (!summary) {
+          pushSkipped++
+          continue
+        }
+
+        // AI 점장 분석 시도
+        const ai = await generateAiManagerReport(summary)
+        const title = ai
+          ? `🤖 AI 점장 일일 리포트`
+          : `📊 일일 리포트`
+        const body = ai?.highlight
+          ? ai.highlight
+          : `오늘 매출 ${summary.sales.total.toLocaleString('ko-KR')}원`
+
+        await sendPushToUser(owner.id, {
+          title,
+          body,
+          url: `${origin}/finance/daily/report`,
+        })
+        pushSent++
+      } catch (e) {
+        console.error('[cron/daily-report] push fail', owner.id, e)
+        pushSkipped++
+      }
+    }
+  }
+
   return NextResponse.json({
     kstHour: hour,
     targets: targets.length,
     sent: results.filter((r) => r.ok).length,
+    pushSent,
+    pushSkipped,
     results,
   })
 }

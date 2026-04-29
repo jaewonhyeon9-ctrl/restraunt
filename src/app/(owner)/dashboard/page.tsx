@@ -7,6 +7,7 @@ import PendingOrdersCard from '@/components/owner/PendingOrdersCard'
 import EmployeePerformanceCard from '@/components/owner/EmployeePerformanceCard'
 import OwnerNotesCard from '@/components/owner/OwnerNotesCard'
 import KakaoIntegrationCard from '@/components/owner/KakaoIntegrationCard'
+import PushSubscribeCard from '@/components/owner/PushSubscribeCard'
 import OcrUsageCard from '@/components/owner/OcrUsageCard'
 import SalesTrendCard from '@/components/owner/SalesTrendCard'
 
@@ -315,6 +316,7 @@ export default function DashboardPage() {
           <div className="rounded-2xl bg-yellow-400/5 ring-1 ring-yellow-400/20 p-4 h-20" />
         }
       >
+        <PushSubscribeCard />
         <KakaoIntegrationCard />
       </Suspense>
 
