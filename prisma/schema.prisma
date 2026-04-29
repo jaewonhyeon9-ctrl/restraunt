@@ -230,17 +230,19 @@ enum ChecklistCategory {
 
 // 체크리스트 템플릿
 model ChecklistTemplate {
-  id            String            @id @default(cuid())
-  restaurantId  String
-  title         String
-  description   String?
-  assignedRole  Role              @default(EMPLOYEE)
-  category      ChecklistCategory @default(HALL)
-  timeSlot      String?
-  scheduledTime String?           // "HH:mm" 형식 (예: "09:30")
-  sortOrder     Int               @default(0)
-  isActive      Boolean           @default(true)
-  createdAt     DateTime          @default(now())
+  id                  String            @id @default(cuid())
+  restaurantId        String
+  title               String
+  description         String?
+  assignedRole        Role              @default(EMPLOYEE)
+  category            ChecklistCategory @default(HALL)
+  timeSlot            String?
+  scheduledTime       String?           // "HH:mm" 형식 (예: "09:30")
+  sortOrder           Int               @default(0)
+  isActive            Boolean           @default(true)
+  requiresPhoto       Boolean           @default(false)  // 사진 인증 필수
+  requiredOnClockOut  Boolean           @default(false)  // 퇴근 시 필수 항목
+  createdAt           DateTime          @default(now())
 
   restaurant    Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   checklistLogs ChecklistLog[]
@@ -256,6 +258,7 @@ model ChecklistLog {
   checkedAt    DateTime?
   isChecked    Boolean   @default(false)
   note         String?
+  photoUrl     String?   // 사진 인증 (Cloudinary URL)
   createdAt    DateTime  @default(now())
 
   template   ChecklistTemplate @relation(fields: [templateId], references: [id])
