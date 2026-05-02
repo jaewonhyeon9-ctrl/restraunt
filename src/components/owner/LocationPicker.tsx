@@ -63,7 +63,10 @@ export function LocationPicker({
       const map = L.map(mapRef.current, {
         center: start,
         zoom: initialLat ? 16 : 13,
-        scrollWheelZoom: true,
+        scrollWheelZoom: false,        // 모달 내부 스크롤 방해 방지
+        dragging: !L.Browser.mobile,   // 모바일에선 페이지 스크롤 우선
+        tap: false,                    // 모바일 탭 충돌 방지
+        zoomControl: true,
       })
       mapInstanceRef.current = map
 

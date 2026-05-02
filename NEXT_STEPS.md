@@ -1,152 +1,188 @@
 # 오토드림 — 진행 상황 & 다음 할 일
 
-> 최종 업데이트: 2026-04-25 밤
+> 최종 업데이트: 2026-04-29 → 2026-05-02 이어서
 
 ---
 
-## 🆕 2026-04-25 (오늘) 완료
+## 🆕 2026-04-29 완료 (전날 push까지 적용 완료)
 
-### 📊 대시보드 강화 (사장 화면)
-- **직원 성과 카드**: 이름 클릭 → `/employees/[id]` 직원 상세 페이지로 바로 이동
-- **`/(owner)/employees/[id]`** 신설: 이번달 근무·급여, 체크리스트 성과, 출퇴근 이력
-- **사장님께 전달사항 카드** (OWNER_NOTE): 최근 7일, 접기/더보기
-- **대기 발주 카드 확장**: 품목 상세 펼치기 + 대시보드에서 바로 승인/거절
+### 1. 모달 / UI 픽스
+- 모든 모달 z-index `z-50` → `z-[60]` (바텀 네비 위로 정상 표시)
+- `vh` → `dvh` (모바일 키보드 가림 해결)
+- safe-area 패딩 (저장 버튼 가려짐 방지)
+- `RestaurantSwitcher` LocationPicker 200px로 컴팩트화
 
-### 🎮 체크리스트 게임화 (직원 동기부여)
-- **MissionClearToast**: 체크 시 "+10 XP" 토스트, 콤보 (x2, x3...), Perfect Day 풀스크린 연출
-- 상단 **Lv 배지 + XP 진행바** (월 누적)
-- `/api/gamification/me`: 월 XP/레벨/오늘 달성 카테고리 반환
+### 2. DB 연결 풀 전환
+- `DATABASE_URL`: Session Pooler(5432) → **Transaction Pooler(6543)** + `pgbouncer=true`
+- `DIRECT_URL` 추가 (마이그레이션 전용)
+- `MaxClientsInSessionMode` 에러 해결
 
-### 📊 마감 리포트
-- **`/api/reports/daily`**: 매출(현금/카드/배달), 지출(카테고리별), 고정비 일할, 출퇴근, 체크리스트 달성률, 발주, 메모 종합
-- **`/finance/daily/report` 페이지**: 공유하기 (Web Share) + 복사 버튼
-- 대시보드에 "📊 오늘 마감 리포트" 그라데이션 CTA
+### 3. 다점포 (Multi-store)
+- `UserRestaurant` 다대다 + `User.activeRestaurantId`
+- `RestaurantSwitcher` 헤더 드롭다운 + 새 매장 추가 모달
+- API: `/api/restaurants/me|switch|create`
+- 기존 1:1 데이터 자동 백필됨
 
-### 💬 카카오톡 자동 발송 연동
-- **`/api/auth/kakao/*`** OAuth 흐름 (state 검증)
-- **`/api/integrations/kakao/*`** 상태/해제/자동발송 토글/즉시발송
-- **`/api/cron/daily-report`** + `vercel.json`: 매시간 cron, 각 사장 설정한 KST 시간에 발송
-- **KakaoIntegrationCard** 대시보드 장착
-- **설정 가이드**: [KAKAO_SETUP.md](./KAKAO_SETUP.md)
+### 4. 매장 위치 지도 클릭 (Leaflet, API 키 0원)
+- `LocationPicker` — 클릭 / 드래그 / "현재 위치 사용"
+- 매장 추가 시 lat/lng 자동 저장
 
----
+### 5. 메뉴 / 레시피 / 매출항목 스키마
+- `Menu`, `MenuRecipe`, `SaleItem` 모델
+- 자동 재고 차감 + 원가율 산출 기반
+- **UI는 다음 작업**
 
-## 🚨 지금 꼭 해야 할 것 (우선순위 순)
+### 6. 달력 매출 OCR 일괄 등록
+- `/api/sales/ocr-calendar` (Gemini Vision 캘린더 전용 프롬프트)
+- `/api/sales/bulk-import` (skip/replace/add)
+- `CalendarSalesOcr` 컴포넌트, `/finance/daily` "📅 달력" 버튼
 
-### 1️⃣ Supabase SQL 실행 (카카오 테이블)
-**왜**: `KakaoIntegration` 테이블이 DB에 없으면 카카오 연동 전체가 동작 안 함.
+### 7. PWA Web Push + AI 점장
+- VAPID 키 + Vercel env
+- `PushSubscription` 모델 + `/api/push/subscribe`
+- `PushSubscribeCard` 대시보드
+- `/api/push/test` 즉시 테스트 알림
+- **AI 점장** (`lib/ai-manager.ts`) — Gemini Flash 분석 + 자연어 리포트
+- 매일 22:00 KST 자동 푸시 (Vercel cron `0 13 * * *`)
 
-**어떻게**:
-1. [Supabase 대시보드](https://supabase.com/dashboard) → SQL Editor → New Query
-2. [prisma/manual-migration-kakao-integration.sql](./prisma/manual-migration-kakao-integration.sql) 전체 복사/붙여넣기
-3. Run (여러 번 실행해도 안전)
+### 8. 직급 계층 (점장/대리/사원)
+- `Role` enum: OWNER, MANAGER, DEPUTY, STAFF (EMPLOYEE 호환)
+- `lib/permissions.ts` — 직급별 권한 헬퍼
+- `proxy.ts` — MANAGER도 사장 영역 접근 OK
+- 6개 API의 OWNER-only 체크 → OWNER+MANAGER 허용
+- **MANAGER (점장)** = 사장 권한 (단 일일 리포트는 OWNER만)
+- **DEPUTY (대리)** = 영수증 OCR + 직원 권한
+- **STAFF (사원)** = 기본 직원 권한
 
-### 2️⃣ 카카오 디벨로퍼 앱 + Vercel 환경변수
-자세한 단계는 [KAKAO_SETUP.md](./KAKAO_SETUP.md).
+### 9. 사진 인증 체크리스트 (스키마만)
+- `ChecklistTemplate.requiresPhoto`, `requiredOnClockOut`
+- `ChecklistLog.photoUrl`
+- 마이그레이션 적용 완료
+- **UI는 다음 작업**
 
-**요약**:
-- https://developers.kakao.com 에서 앱 생성 → REST API 키 복사
-- 플랫폼(Web) + Redirect URI + 카카오 로그인 활성화 + `talk_message` 동의항목
-- Vercel env 3개 추가: `KAKAO_REST_API_KEY`, `KAKAO_REDIRECT_URI`, `CRON_SECRET`
-- Redeploy → 대시보드 "카카오톡 연결하기" 클릭
-
-### 3️⃣ PWABuilder에서 Package ID 변경 AAB 재생성
-**왜**: Package ID `com.dechalkak.app` → `com.autodream.app` 변경. Play Store 업로드 전 유일한 기회.
-
-**어떻게**:
-1. https://www.pwabuilder.com 접속
-2. URL 입력: `https://restraunt-ebon-phi.vercel.app?v=5` (캐시 우회)
-3. Package For Stores → Android → Google Play 탭
-4. 옵션:
-   - Package ID: **`com.autodream.app`** ⭐
-   - App name: `오토드림`
-5. "All Settings ▶" 펼치기 → Signing Key: **"New"** 선택
-6. Download Package → ZIP 다운로드
-
-**ZIP 안에서 클로드에게 줄 것**:
-- `assetlinks.json` 내용 (`public/.well-known/assetlinks.json`에 배포)
-
-**ZIP 안에서 사용자가 보관할 것**:
-- `signing.keystore` — Play Store 업데이트 영구 키, 여러 곳 백업 필수
-- `signing-key-info.txt` — 비밀번호/alias
-
-### 4️⃣ Google Play 개발자 계정 승인 확인
-- Gmail(`jaewonhyeon9@gmail.com`) 편지함에서 Google Play 안내 메일 확인
-- 승인 완료 시 → Play Console 앱 등록 진행
-
-### 5️⃣ Play Console에 앱 등록 (승인 후)
-필요한 자료:
-- **AAB 파일**: PWABuilder에서 받은 `오토드림.aab` (3번 결과물)
-- **스크린샷**: 폰에서 앱 주요 화면 2~8장 (최소 2장)
-- **고해상도 아이콘**: `play-store-icon-512.png` (이미 있음)
-- **피처 그래픽**: https://restraunt-ebon-phi.vercel.app/feature-graphic-1024x500.png
-- **앱 설명**: [PLAY_STORE_LISTING.md](./PLAY_STORE_LISTING.md)
-- **개인정보처리방침 URL**: https://restraunt-ebon-phi.vercel.app/privacy
-- **콘텐츠 등급/타겟 고객/데이터 보안** 설문
+### 10. 특허 명세서 PDF 4종
+- `PATENT_DRAFT.pdf` / `PATENT_PRIOR_ART.pdf` / `PATENT_ONE_PAGER.pdf` / `PATENT_DRAFT_EN.pdf`
+- 청구 후보 11개 (다단계/OCR 매출/재고차감/매핑학습/정규화/PWA/AI리포트/발주예측/원가율/GPS급여/엑셀고정비)
 
 ---
 
-## 📁 중요 경로 & 링크
+## 📋 진행 중 / 미완성
 
-### 배포 & 저장소
-- **라이브 사이트**: https://restraunt-ebon-phi.vercel.app
-- **GitHub 레포**: https://github.com/jaewonhyeon9-ctrl/restraunt
-- **Vercel 프로젝트 이름**: `restraunt` (오타 있음, 계속 사용)
+### 우선순위 A — 약속한 기능 마무리
 
-### 로컬 경로
-- **프로젝트**: `C:\Users\Hyun Jae Won\Desktop\restaurant-app`
-- **데스크탑 바로가기**: `C:\Users\Hyun Jae Won\Desktop\오토드림.lnk`
-- **Play Store 등록 자료**: [PLAY_STORE_LISTING.md](./PLAY_STORE_LISTING.md)
-- **카카오 연동 가이드**: [KAKAO_SETUP.md](./KAKAO_SETUP.md)
+**1. 직원 등록 시 직급 선택 UI** ⏳ 작업 시작
+- 현재 `/api/employees`가 `role: 'EMPLOYEE'` 강제 저장
+- 폼에 직급 selector (점장/대리/사원) 추가
+- 영향:
+  - `src/app/api/employees/route.ts` POST/GET (role 필터 + 입력)
+  - `src/app/api/employees/[id]/route.ts` PATCH (role 변경)
+  - `src/app/(owner)/employees/page.tsx` 폼 + 리스트 표시
+- `lib/permissions.ts` 의 `ROLE_OPTIONS` 사용
 
-### 키스토어 백업 (현재는 구 버전 — dechalkak)
-- `C:\Users\Hyun Jae Won\Documents\dechalkak-keystore-backup\`
-- `C:\Users\Hyun Jae Won\OneDrive\dechalkak-keystore-backup\`
-- `C:\Users\Hyun Jae Won\Desktop\다운로드\dechalkak-v2\`
+**2. 퇴근 사진 체크리스트 UI**
+- 스키마는 적용됨
+- 사장 admin: `/checklist-admin` 에 `requiresPhoto` / `requiredOnClockOut` 토글
+- 직원 UI: 클럭아웃 전 체크 + 사진 업로드 강제
+- 사진 업로드: Cloudinary (기존 인프라 재사용)
 
-> ⚠️ 새 Package ID(`com.autodream.app`)로 AAB 생성 후 새 키스토어로 교체됨.
-> 새 키스토어 받으면 `autodream-keystore-backup/` 폴더 새로 만들어 백업.
+**3. 메뉴 / 레시피 / 원가율 UI**
+- 메뉴 CRUD 페이지 (`/menu` 신설)
+- 메뉴별 레시피(재고 매핑)
+- 매출 입력 시 메뉴 선택 → 자동 차감
+- 원가율 대시보드 (메뉴별 / 전체)
 
-### 마이그레이션 파일 (Supabase에서 실행)
-- [prisma/manual-migration-add-checklist-category.sql](./prisma/manual-migration-add-checklist-category.sql) ✅ 실행됨
-- [prisma/manual-migration-add-tax-fields.sql](./prisma/manual-migration-add-tax-fields.sql) ✅ 실행됨 (이전 세션 기준)
-- [prisma/manual-migration-kakao-integration.sql](./prisma/manual-migration-kakao-integration.sql) ⚠️ **아직 실행 필요**
+### 우선순위 B — UI 정리 / 온보딩 (베타 피드백 후)
 
----
+**4. 대시보드 카드 재배치 + "설정" 페이지 분리**
+- 대시보드 = 매일 보는 핵심만
+- 설정 페이지 신설: 카카오/푸시/매장/OCR 사용량
 
-## 💰 수익 모델 (결정 사항)
-
-### Freemium + 월 구독 3-tier (애드센스 대신)
-| 티어 | 월 가격 | 포함 |
-|-----|--------|------|
-| 무료 | 0원 | 체크리스트·출퇴근·직원 3명·OCR 월 30장 |
-| Standard | 19,900원 | 무제한 직원·재고·발주·OCR 월 300장·마감 리포트 |
-| Pro | 39,900원 | + 매장별 대시보드·POS 연동·OCR 무제한 |
-
-**전환 시점**: 사용자 100명 돌파 후 Standard 티어 론칭.
-
-### 현재 개발 중
-- **OCR 월 제한 로직** (Plan enum + OcrUsage 집계) — 유료 플랜 준비용
-- **매출 추이 차트** (대시보드) — 7일/30일 탭
+**5. 신규 사용자 온보딩 가이드**
 
 ---
 
-## 💡 개발 워크플로우 (기억해둘 것)
+## 🛠 운영 가이드
 
-- **배포 방식**: CLI `vercel deploy` 쓰지 말고 **`git push`만** — 자동 배포됨
-- **CLI 배포하면 롤백 위험**: 로컬이 origin/main보다 뒤져 있으면 프로덕션을 과거로 돌림
-- **스키마 변경 시**: `prisma/schema.prisma` 수정 → `prisma/manual-migration-*.sql` 파일 생성 → Supabase SQL Editor 수동 실행 (`prisma migrate` 사용 안 함)
-- **이미지 생성**: Python + Pillow (시스템에 설치됨, Malgun/MalgunBd 폰트로 한글 렌더링)
-- **커밋 메시지 Co-Authored-By 포함** 유지
+### DB 마이그레이션 (프로덕션)
+
+```bash
+DATABASE_URL='postgresql://postgres.xtujnrdxlcfmpjpvsiqe:guswodnjs12%5E%5E@aws-1-ap-south-1.pooler.supabase.com:5432/postgres' \
+node scripts/run-migrations.mjs prisma/manual-migration-XXX.sql
+```
+
+### 배포
+
+```bash
+git add -A && git commit -m "..." && git push  # Vercel 자동 배포
+```
+
+### Prisma 클라이언트 재생성
+
+```bash
+npx prisma generate
+```
 
 ---
 
-## 🎯 그 외 여유 있을 때
+## 📝 마이그레이션 히스토리 (최신)
 
-- [ ] 로고 아이콘 전문 디자인 교체 (현재 임시 접시+포크&나이프+셔터링)
-- [ ] 앱 온보딩 튜토리얼 (첫 로그인 시 기능 안내)
-- [ ] 이용약관 `/terms` 페이지 작성
-- [ ] 주문 화면 QR 메뉴 기능
-- [ ] PWA 설치 프롬프트 (InstallPrompt 컴포넌트)
-- [ ] 커뮤니티 Phase 1: 네이버 카페 or 카톡 오픈채팅방 + 앱 내 링크
-- [ ] 커뮤니티 Phase 2: 앱 내 "팁/공지" 섹션 (읽기 전용, 주 1~2회 포스팅)
+| 파일 | 내용 |
+|---|---|
+| `manual-migration-add-checklist-category.sql` | 체크리스트 카테고리 |
+| `manual-migration-add-tax-fields.sql` | 세금 필드 |
+| `manual-migration-kakao-integration.sql` | 카카오톡 연동 |
+| `manual-migration-plan-ocr-usage.sql` | OCR 사용량 |
+| `manual-migration-add-menu-recipe.sql` | Menu / MenuRecipe / SaleItem |
+| `manual-migration-multi-store.sql` | UserRestaurant + activeRestaurantId |
+| `manual-migration-push-subscription.sql` | PushSubscription |
+| `manual-migration-role-hierarchy.sql` | Role enum 확장 |
+| `manual-migration-photo-checklist.sql` | requiresPhoto, requiredOnClockOut, photoUrl |
+
+---
+
+## 🔐 Vercel 환경변수 (현재)
+
+```
+DATABASE_URL                    ✓ Transaction Pooler 6543
+DIRECT_URL                      ✓ Session Pooler 5432
+NEXTAUTH_SECRET                 ✓
+NEXTAUTH_URL                    ✓
+GEMINI_API_KEY                  ✓ (OCR + AI 점장)
+CLOUDINARY_*                    ✓
+KAKAO_REST_API_KEY              ✓
+KAKAO_REDIRECT_URI              ✓
+NEXT_PUBLIC_VAPID_PUBLIC_KEY    ✓ Web Push
+VAPID_PRIVATE_KEY               ✓
+VAPID_SUBJECT                   ✓
+```
+
+---
+
+## 🎯 사용자 테스트 흐름
+
+### 1. 다점포
+- 헤더 매장 드롭다운 → "+ 새 매장 추가" → 지도 클릭으로 위치 지정 → 자동 전환
+
+### 2. 푸시 알림
+- 대시보드 "🔔 앱 알림" → "AI 점장 알림 켜기" → 권한 허용
+- "🔔 테스트 알림 보내기" → 즉시 폰에 알림
+- 매일 22:00 KST 자동 발송
+
+### 3. 달력 매출 일괄 등록
+- /finance/daily → "📅 달력" → 사진 업로드 → 분석 → 일괄 등록
+
+### 4. 직급 권한
+- DB에서 `User.role` 직접 수정 (UI 다음 배치)
+- MANAGER: 사장과 동일 권한
+- DEPUTY: 영수증 OCR 추가
+- STAFF: 기본 직원 화면만
+
+---
+
+## 🚀 다음 세션 시작 메시지
+
+> "오토드림 이어서. 직원 등록 직급 선택 UI부터."
+
+또는
+
+> "테스트 피드백 [구체 내용]"

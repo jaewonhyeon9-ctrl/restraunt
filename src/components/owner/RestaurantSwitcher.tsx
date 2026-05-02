@@ -141,10 +141,13 @@ export function RestaurantSwitcher() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white rounded-t-3xl p-5 space-y-3 max-h-[88dvh] overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+16px)] overscroll-contain"
+            className="w-full max-w-md bg-white rounded-t-3xl flex flex-col max-h-[90dvh] overscroll-contain"
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-gray-900">매장 선택</h3>
+            {/* Header (sticky top) */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
+              <h3 className="text-base font-bold text-gray-900">
+                {creating ? '새 매장 추가' : '매장 선택'}
+              </h3>
               <button
                 onClick={() => setOpen(false)}
                 disabled={pending}
@@ -156,94 +159,110 @@ export function RestaurantSwitcher() {
               </button>
             </div>
 
-            <ul className="space-y-1.5">
-              {restaurants.map((r) => {
-                const isActive = r.id === activeId
-                return (
-                  <li key={r.id}>
-                    <button
-                      type="button"
-                      onClick={() => switchTo(r.id)}
-                      disabled={pending}
-                      className={
-                        'w-full text-left rounded-xl px-3.5 py-3 transition-colors flex items-center gap-3 ' +
-                        (isActive
-                          ? 'bg-orange-50 border-2 border-orange-400'
-                          : 'bg-gray-50 border-2 border-transparent hover:border-gray-200')
-                      }
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {r.name}
-                          {r.isPrimary && (
-                            <span className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                              주
-                            </span>
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+              {!creating && (
+                <ul className="space-y-1.5">
+                  {restaurants.map((r) => {
+                    const isActive = r.id === activeId
+                    return (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          onClick={() => switchTo(r.id)}
+                          disabled={pending}
+                          className={
+                            'w-full text-left rounded-xl px-3.5 py-3 transition-colors flex items-center gap-3 ' +
+                            (isActive
+                              ? 'bg-orange-50 border-2 border-orange-400'
+                              : 'bg-gray-50 border-2 border-transparent hover:border-gray-200')
+                          }
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {r.name}
+                              {r.isPrimary && (
+                                <span className="ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                                  주
+                                </span>
+                              )}
+                            </p>
+                            {r.address && (
+                              <p className="text-[11px] text-gray-500 truncate">{r.address}</p>
+                            )}
+                          </div>
+                          <span
+                            className={
+                              'text-[10px] px-1.5 py-0.5 rounded-full font-semibold ' +
+                              (r.role === 'OWNER'
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-200 text-slate-700')
+                            }
+                          >
+                            {r.role === 'OWNER' ? '사장' : '매니저'}
+                          </span>
+                          {isActive && (
+                            <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                            </svg>
                           )}
-                        </p>
-                        {r.address && (
-                          <p className="text-[11px] text-gray-500 truncate">{r.address}</p>
-                        )}
-                      </div>
-                      <span
-                        className={
-                          'text-[10px] px-1.5 py-0.5 rounded-full font-semibold ' +
-                          (r.role === 'OWNER'
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-200 text-slate-700')
-                        }
-                      >
-                        {r.role === 'OWNER' ? '사장' : '매니저'}
-                      </span>
-                      {isActive && (
-                        <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
 
-            {!creating ? (
-              <button
-                type="button"
-                onClick={() => setCreating(true)}
-                disabled={pending}
-                className="w-full rounded-xl border-2 border-dashed border-gray-300 py-3 text-sm font-medium text-gray-600 hover:border-orange-400 hover:text-orange-500"
-              >
-                + 새 매장 추가
-              </button>
-            ) : (
-              <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-3 space-y-2">
-                <p className="text-xs font-semibold text-orange-700">새 매장 추가</p>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="매장 이름 *"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
-                />
-                <input
-                  type="text"
-                  value={newAddress}
-                  onChange={(e) => setNewAddress(e.target.value)}
-                  placeholder="주소 (선택)"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
-                />
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-700 mb-1">📍 매장 위치 (지도 클릭)</p>
-                  <LocationPicker
-                    initialLat={null}
-                    initialLng={null}
-                    height="200px"
-                    onChange={(lat, lng) => {
-                      setNewLat(lat)
-                      setNewLng(lng)
-                    }}
+              {creating && (
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="매장 이름 *"
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
                   />
+                  <input
+                    type="text"
+                    value={newAddress}
+                    onChange={(e) => setNewAddress(e.target.value)}
+                    placeholder="주소 (선택)"
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
+                  />
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-700 mb-1">📍 매장 위치 (지도 클릭 또는 "현재 위치 사용")</p>
+                    <LocationPicker
+                      initialLat={null}
+                      initialLng={null}
+                      height="220px"
+                      onChange={(lat, lng) => {
+                        setNewLat(lat)
+                        setNewLng(lng)
+                      }}
+                    />
+                  </div>
                 </div>
+              )}
+
+              {error && (
+                <p className="rounded-md bg-red-50 border border-red-200 px-2.5 py-1.5 text-xs text-red-700">
+                  {error}
+                </p>
+              )}
+            </div>
+
+            {/* Footer (sticky bottom) */}
+            <div className="flex-shrink-0 px-5 py-3 border-t border-gray-100 bg-white pb-[calc(env(safe-area-inset-bottom)+12px)]">
+              {!creating ? (
+                <button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  disabled={pending}
+                  className="w-full rounded-xl border-2 border-dashed border-gray-300 py-3 text-sm font-medium text-gray-600 hover:border-orange-400 hover:text-orange-500"
+                >
+                  + 새 매장 추가
+                </button>
+              ) : (
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -251,9 +270,12 @@ export function RestaurantSwitcher() {
                       setCreating(false)
                       setNewName('')
                       setNewAddress('')
+                      setNewLat(null)
+                      setNewLng(null)
                       setError(null)
                     }}
-                    className="flex-1 rounded-lg border border-gray-300 py-2 text-xs text-gray-700"
+                    disabled={pending}
+                    className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700"
                   >
                     취소
                   </button>
@@ -261,19 +283,13 @@ export function RestaurantSwitcher() {
                     type="button"
                     onClick={createRestaurant}
                     disabled={pending || !newName.trim()}
-                    className="flex-1 rounded-lg bg-orange-500 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                    className="flex-1 rounded-lg bg-orange-500 py-2.5 text-sm font-bold text-white disabled:opacity-50"
                   >
                     {pending ? '생성 중…' : '생성'}
                   </button>
                 </div>
-              </div>
-            )}
-
-            {error && (
-              <p className="rounded-md bg-red-50 border border-red-200 px-2.5 py-1.5 text-xs text-red-700">
-                {error}
-              </p>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
