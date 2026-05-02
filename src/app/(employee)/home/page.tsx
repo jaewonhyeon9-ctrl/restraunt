@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useGeolocation } from '@/hooks/useGeolocation'
+import { calculateDistance } from '@/lib/gps'
 
 interface AttendanceStatus {
   clockIn: string | null
@@ -102,26 +103,67 @@ export default function EmployeeHomePage() {
     fetchChecklist()
   }, [fetchAttendance, fetchChecklist])
 
+  // 클릭 시점에 GPS 재측정 (정확도 우선)
+  const acquireFreshLocation = (): Promise<{ lat: number; lng: number; accuracy: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('GPS를 지원하지 않는 기기'))
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          })
+        },
+        (err) => reject(new Error(err.message || '위치를 가져올 수 없어요')),
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      )
+    })
+  }
+
   const handleAttendance = async (type: 'in' | 'out') => {
     if (restaurant && (restaurant.lat == null || restaurant.lng == null)) {
       setError('사장님이 아직 식당 위치를 설정하지 않았습니다.')
       return
     }
-    if (!geo.lat || !geo.lng) {
-      setError('GPS 위치를 확인할 수 없습니다.')
-      return
-    }
-    if (!geo.isWithinRange) {
-      setError(`식당 반경 ${restaurant?.gpsRadius ?? 50}m 이내에서만 출퇴근이 가능합니다.`)
-      return
-    }
+
     setError(null)
     setLoading(true)
+
     try {
+      // 1단계: 클릭 시점 신선한 GPS 측정
+      let fresh: { lat: number; lng: number; accuracy: number }
+      try {
+        fresh = await acquireFreshLocation()
+      } catch (e) {
+        setError(
+          (e instanceof Error ? e.message : '') +
+            ' (위치 권한을 확인해주세요)'
+        )
+        return
+      }
+
+      // 2단계: 식당 반경 체크 (즉시 피드백)
+      if (restaurant?.lat != null && restaurant?.lng != null) {
+        const dist = calculateDistance(fresh.lat, fresh.lng, restaurant.lat, restaurant.lng)
+        const radius = restaurant.gpsRadius ?? 50
+        if (dist > radius) {
+          setError(
+            `식당 반경 ${radius}m 이내에서만 출퇴근이 가능합니다. ` +
+              `현재 거리 ${Math.round(dist)}m (정확도 ±${Math.round(fresh.accuracy)}m)`
+          )
+          return
+        }
+      }
+
+      // 3단계: 서버 전송
       const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, lat: geo.lat, lng: geo.lng }),
+        body: JSON.stringify({ type, lat: fresh.lat, lng: fresh.lng }),
       })
       const data = await res.json()
       if (!res.ok) {
