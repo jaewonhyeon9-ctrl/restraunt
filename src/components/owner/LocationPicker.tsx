@@ -60,14 +60,15 @@ export function LocationPicker({
         initialLat ?? SEOUL.lat,
         initialLng ?? SEOUL.lng,
       ]
-      const map = L.map(mapRef.current, {
+      const mapOptions = {
         center: start,
         zoom: initialLat ? 16 : 13,
-        scrollWheelZoom: false,        // 모달 내부 스크롤 방해 방지
-        dragging: !L.Browser.mobile,   // 모바일에선 페이지 스크롤 우선
-        tap: false,                    // 모바일 탭 충돌 방지
+        scrollWheelZoom: false,
+        dragging: !L.Browser.mobile,
         zoomControl: true,
-      })
+        tap: false, // 모바일 탭 충돌 방지 (런타임에는 존재)
+      } as L.MapOptions
+      const map = L.map(mapRef.current, mapOptions)
       mapInstanceRef.current = map
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
