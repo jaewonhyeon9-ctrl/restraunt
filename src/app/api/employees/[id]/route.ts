@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { normalizeRole, type RoleValue } from '@/lib/permissions'
+
+const EMPLOYEE_ROLES = ['MANAGER', 'DEPUTY', 'STAFF', 'EMPLOYEE'] as const
 
 export async function GET(
   _req: NextRequest,
@@ -34,7 +37,7 @@ export async function GET(
     todayEnd.setHours(23, 59, 59, 999)
 
     const employee = await prisma.user.findFirst({
-      where: { id, restaurantId, role: 'EMPLOYEE' },
+      where: { id, restaurantId, role: { in: [...EMPLOYEE_ROLES] } },
       include: {
         attendance: {
           where: { date: { gte: monthStart, lt: monthEnd } },
@@ -92,6 +95,7 @@ export async function GET(
       name: employee.name,
       email: employee.email,
       phone: employee.phone,
+      role: normalizeRole(employee.role),
       hourlyWage: employee.hourlyWage,
       fixedMonthlyWage: employee.monthlyWage,
       hireDate: employee.hireDate?.toISOString() ?? null,
@@ -136,18 +140,24 @@ export async function PATCH(
     const { id } = await params
 
     const existing = await prisma.user.findFirst({
-      where: { id, restaurantId, role: 'EMPLOYEE' },
+      where: { id, restaurantId, role: { in: [...EMPLOYEE_ROLES] } },
     })
     if (!existing) {
       return NextResponse.json({ error: '직원을 찾을 수 없습니다' }, { status: 404 })
     }
 
     const body = await req.json()
-    const { name, phone, hourlyWage, monthlyWage, hireDate, isActive, newPassword } = body
+    const { name, phone, role, hourlyWage, monthlyWage, hireDate, isActive, newPassword } = body
 
     const updateData: Record<string, unknown> = {}
     if (name !== undefined) updateData.name = name.trim()
     if (phone !== undefined) updateData.phone = phone?.trim() || null
+    if (role !== undefined) {
+      if (!EMPLOYEE_ROLES.includes(role as typeof EMPLOYEE_ROLES[number])) {
+        return NextResponse.json({ error: '직급 값이 올바르지 않습니다' }, { status: 400 })
+      }
+      updateData.role = role as RoleValue
+    }
     if (hourlyWage !== undefined) updateData.hourlyWage = hourlyWage ? Number(hourlyWage) : null
     if (monthlyWage !== undefined) updateData.monthlyWage = monthlyWage ? Number(monthlyWage) : null
     if (hireDate !== undefined) updateData.hireDate = hireDate ? new Date(hireDate) : null
@@ -166,6 +176,7 @@ export async function PATCH(
       name: updated.name,
       email: updated.email,
       phone: updated.phone,
+      role: normalizeRole(updated.role),
       hourlyWage: updated.hourlyWage,
       monthlyWage: updated.monthlyWage,
       hireDate: updated.hireDate?.toISOString() ?? null,
@@ -195,7 +206,7 @@ export async function DELETE(
     const { id } = await params
 
     const existing = await prisma.user.findFirst({
-      where: { id, restaurantId, role: 'EMPLOYEE' },
+      where: { id, restaurantId, role: { in: [...EMPLOYEE_ROLES] } },
     })
     if (!existing) {
       return NextResponse.json({ error: '직원을 찾을 수 없습니다' }, { status: 404 })

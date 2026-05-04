@@ -25,11 +25,21 @@ export async function POST(req: NextRequest) {
   }
 
   // 사장만 새 매장 생성 가능
+  // - User.role이 OWNER이거나
+  // - UserRestaurant 중 하나라도 OWNER 권한이면 통과 (다점포 사장 케이스)
   const me = await prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true },
+    select: {
+      role: true,
+      restaurantAccess: {
+        where: { role: 'OWNER' },
+        select: { id: true },
+        take: 1,
+      },
+    },
   })
-  if (!me || me.role !== 'OWNER') {
+  const isOwner = me?.role === 'OWNER' || (me?.restaurantAccess?.length ?? 0) > 0
+  if (!me || !isOwner) {
     return NextResponse.json({ error: '사장만 매장 생성 가능' }, { status: 403 })
   }
 

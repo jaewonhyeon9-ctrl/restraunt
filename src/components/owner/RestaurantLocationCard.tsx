@@ -8,6 +8,7 @@ interface RestaurantInfo {
   lat: number | null
   lng: number | null
   gpsRadius: number
+  gpsEnforced: boolean
 }
 
 export default function RestaurantLocationCard() {
@@ -76,8 +77,8 @@ export default function RestaurantLocationCard() {
   }
 
   const handleSaveRadius = async () => {
-    if (radiusInput < 10 || radiusInput > 500) {
-      showMessage('error', '반경은 10m~500m 사이여야 합니다.')
+    if (radiusInput < 10 || radiusInput > 2000) {
+      showMessage('error', '반경은 10m~2000m 사이여야 합니다.')
       return
     }
     setSaving(true)
@@ -153,7 +154,7 @@ export default function RestaurantLocationCard() {
         <input
           type="number"
           min={10}
-          max={500}
+          max={2000}
           step={10}
           value={radiusInput}
           onChange={(e) => setRadiusInput(Number(e.target.value))}
@@ -166,6 +167,48 @@ export default function RestaurantLocationCard() {
           className="btn-ghost !px-3 !py-2 !text-xs disabled:opacity-40"
         >
           저장
+        </button>
+      </div>
+
+      {/* GPS 검증 우회 토글 */}
+      <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+        <div className="flex-1 mr-2">
+          <p className="text-xs font-medium text-slate-300">GPS 검증</p>
+          <p className="text-[10px] text-slate-500">
+            끄면 직원이 위치 무관하게 출퇴근 가능 (실내/오프라인 매장용)
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            setSaving(true)
+            try {
+              const res = await fetch('/api/restaurant', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gpsEnforced: !info?.gpsEnforced }),
+              })
+              const data = await res.json()
+              if (res.ok) {
+                setInfo(data)
+                showMessage('success', `GPS 검증 ${data.gpsEnforced ? '켜짐' : '꺼짐'}`)
+              } else {
+                showMessage('error', data.error ?? '저장 실패')
+              }
+            } finally {
+              setSaving(false)
+            }
+          }}
+          disabled={saving}
+          className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+            info?.gpsEnforced === false ? 'bg-slate-600' : 'bg-emerald-500'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              info?.gpsEnforced === false ? '' : 'translate-x-5'
+            }`}
+          />
         </button>
       </div>
 

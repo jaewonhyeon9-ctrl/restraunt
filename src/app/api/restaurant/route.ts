@@ -16,7 +16,7 @@ export async function GET() {
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
-    select: { name: true, address: true, lat: true, lng: true, gpsRadius: true },
+    select: { name: true, address: true, lat: true, lng: true, gpsRadius: true, gpsEnforced: true },
   })
 
   if (!restaurant) {
@@ -25,6 +25,8 @@ export async function GET() {
 
   return NextResponse.json(restaurant)
 }
+
+const MAX_GPS_RADIUS = 2000
 
 // PATCH: 식당 위치/반경 업데이트 (사장 전용)
 export async function PATCH(req: NextRequest) {
@@ -43,14 +45,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: '사업장 정보를 찾을 수 없습니다.' }, { status: 400 })
   }
 
-  let body: { lat?: number; lng?: number; gpsRadius?: number; address?: string }
+  let body: { lat?: number; lng?: number; gpsRadius?: number; address?: string; gpsEnforced?: boolean }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 })
   }
 
-  const { lat, lng, gpsRadius, address } = body
+  const { lat, lng, gpsRadius, address, gpsEnforced } = body
 
   if (lat != null && (typeof lat !== 'number' || lat < -90 || lat > 90)) {
     return NextResponse.json({ error: '위도 값이 올바르지 않습니다.' }, { status: 400 })
@@ -58,8 +60,11 @@ export async function PATCH(req: NextRequest) {
   if (lng != null && (typeof lng !== 'number' || lng < -180 || lng > 180)) {
     return NextResponse.json({ error: '경도 값이 올바르지 않습니다.' }, { status: 400 })
   }
-  if (gpsRadius != null && (typeof gpsRadius !== 'number' || gpsRadius < 10 || gpsRadius > 500)) {
-    return NextResponse.json({ error: '반경은 10m~500m 사이여야 합니다.' }, { status: 400 })
+  if (gpsRadius != null && (typeof gpsRadius !== 'number' || gpsRadius < 10 || gpsRadius > MAX_GPS_RADIUS)) {
+    return NextResponse.json({ error: `반경은 10m~${MAX_GPS_RADIUS}m 사이여야 합니다.` }, { status: 400 })
+  }
+  if (gpsEnforced != null && typeof gpsEnforced !== 'boolean') {
+    return NextResponse.json({ error: 'GPS 검증 값이 올바르지 않습니다.' }, { status: 400 })
   }
 
   const updated = await prisma.restaurant.update({
@@ -69,8 +74,9 @@ export async function PATCH(req: NextRequest) {
       ...(lng != null && { lng }),
       ...(gpsRadius != null && { gpsRadius }),
       ...(address != null && { address }),
+      ...(gpsEnforced != null && { gpsEnforced }),
     },
-    select: { name: true, address: true, lat: true, lng: true, gpsRadius: true },
+    select: { name: true, address: true, lat: true, lng: true, gpsRadius: true, gpsEnforced: true },
   })
 
   return NextResponse.json(updated)

@@ -65,15 +65,19 @@ export async function POST(req: NextRequest) {
   // 서버측 GPS 검증
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
-    select: { lat: true, lng: true, gpsRadius: true },
+    select: { lat: true, lng: true, gpsRadius: true, gpsEnforced: true },
   })
 
-  if (restaurant?.lat && restaurant?.lng) {
+  if (restaurant?.gpsEnforced !== false && restaurant?.lat && restaurant?.lng) {
     const distance = calculateDistance(lat, lng, restaurant.lat, restaurant.lng)
-    const radius = restaurant.gpsRadius ?? 50
+    const radius = restaurant.gpsRadius ?? 200
     if (distance > radius) {
       return NextResponse.json(
-        { error: `식당 반경 ${radius}m 이내에서만 출퇴근이 가능합니다. (현재 ${Math.round(distance)}m)` },
+        {
+          error:
+            `식당 반경 ${radius}m 이내에서만 출퇴근이 가능합니다. (현재 ${Math.round(distance)}m). ` +
+            `실내라면 입구나 창가에서 시도하거나, 사장님께 GPS 검증 우회를 요청하세요.`,
+        },
         { status: 400 }
       )
     }

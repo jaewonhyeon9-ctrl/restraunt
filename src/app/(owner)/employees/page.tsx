@@ -1,12 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ROLE_LABEL, ROLE_OPTIONS, type RoleValue } from '@/lib/permissions'
+
+const EMPLOYEE_ROLE_OPTIONS = ROLE_OPTIONS.filter((opt) => opt.value !== 'OWNER')
+
+const ROLE_BADGE_STYLE: Record<RoleValue, string> = {
+  OWNER: 'bg-slate-900 text-white',
+  MANAGER: 'bg-blue-100 text-blue-700',
+  DEPUTY: 'bg-purple-100 text-purple-700',
+  STAFF: 'bg-gray-100 text-gray-600',
+  EMPLOYEE: 'bg-gray-100 text-gray-600',
+}
 
 interface Employee {
   id: string
   name: string
   email: string
   phone: string | null
+  role: RoleValue
   hourlyWage: number | null
   fixedMonthlyWage: number | null
   hireDate: string | null
@@ -21,6 +33,7 @@ interface EmployeeForm {
   email: string
   password: string
   phone: string
+  role: RoleValue
   wageType: 'hourly' | 'monthly' | 'none'
   wageAmount: string
   hireDate: string
@@ -31,6 +44,7 @@ const EMPTY_FORM: EmployeeForm = {
   email: '',
   password: '',
   phone: '',
+  role: 'STAFF',
   wageType: 'none',
   wageAmount: '',
   hireDate: '',
@@ -88,6 +102,7 @@ export default function EmployeesPage() {
       email: emp.email,
       password: '',
       phone: emp.phone ?? '',
+      role: emp.role === 'EMPLOYEE' ? 'STAFF' : emp.role,
       wageType: emp.hourlyWage != null ? 'hourly' : emp.fixedMonthlyWage != null ? 'monthly' : 'none',
       wageAmount: emp.hourlyWage != null
         ? String(emp.hourlyWage)
@@ -114,6 +129,7 @@ export default function EmployeesPage() {
       const payload: Record<string, unknown> = {
         name: form.name,
         phone: form.phone || undefined,
+        role: form.role,
         hourlyWage: form.wageType === 'hourly' && form.wageAmount ? Number(form.wageAmount) : null,
         monthlyWage: form.wageType === 'monthly' && form.wageAmount ? Number(form.wageAmount) : null,
         hireDate: form.hireDate || undefined,
@@ -228,9 +244,14 @@ export default function EmployeesPage() {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={`font-bold text-base ${emp.isActive ? 'text-gray-900' : 'text-gray-400'}`}>
                       {emp.name}
+                    </span>
+                    <span
+                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ROLE_BADGE_STYLE[emp.role]}`}
+                    >
+                      {ROLE_LABEL[emp.role]}
                     </span>
                     {!emp.isActive && (
                       <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">
@@ -410,6 +431,32 @@ export default function EmployeesPage() {
                     )}
                   </div>
                 )}
+
+                {/* 직급 */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">
+                    직급 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {EMPLOYEE_ROLE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setForm({ ...form, role: opt.value })}
+                        className={`py-2 rounded-xl border-2 text-xs font-semibold transition-colors ${
+                          form.role === opt.value
+                            ? 'bg-orange-500 text-white border-orange-500'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    {EMPLOYEE_ROLE_OPTIONS.find((o) => o.value === form.role)?.description}
+                  </p>
+                </div>
 
                 {/* 전화번호 */}
                 <div>

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { normalizeRole, type RoleValue } from '@/lib/permissions'
+
+const EMPLOYEE_ROLES = ['MANAGER', 'DEPUTY', 'STAFF', 'EMPLOYEE'] as const
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,7 +28,7 @@ export async function GET(req: NextRequest) {
     const employees = await prisma.user.findMany({
       where: {
         restaurantId,
-        role: 'EMPLOYEE',
+        role: { in: [...EMPLOYEE_ROLES] },
         ...(includeInactive ? {} : { isActive: true }),
       },
       orderBy: { createdAt: 'asc' },
@@ -56,6 +59,7 @@ export async function GET(req: NextRequest) {
         name: emp.name,
         email: emp.email,
         phone: emp.phone,
+        role: normalizeRole(emp.role),
         hourlyWage: emp.hourlyWage,
         fixedMonthlyWage: emp.monthlyWage,
         hireDate: emp.hireDate?.toISOString() ?? null,
@@ -86,7 +90,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { name, email, password, phone, hourlyWage, monthlyWage, hireDate } = body
+    const { name, email, password, phone, role, hourlyWage, monthlyWage, hireDate } = body
 
     if (!name?.trim()) {
       return NextResponse.json({ error: '이름은 필수입니다' }, { status: 400 })
@@ -96,6 +100,11 @@ export async function POST(req: NextRequest) {
     }
     if (!password) {
       return NextResponse.json({ error: '비밀번호는 필수입니다' }, { status: 400 })
+    }
+
+    const requestedRole = (role as RoleValue | undefined) ?? 'STAFF'
+    if (!EMPLOYEE_ROLES.includes(requestedRole as typeof EMPLOYEE_ROLES[number])) {
+      return NextResponse.json({ error: '직급 값이 올바르지 않습니다' }, { status: 400 })
     }
 
     const existing = await prisma.user.findUnique({ where: { email: email.trim() } })
@@ -111,7 +120,7 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         email: email.trim(),
         passwordHash,
-        role: 'EMPLOYEE',
+        role: requestedRole,
         phone: phone?.trim() || null,
         hourlyWage: hourlyWage ? Number(hourlyWage) : null,
         monthlyWage: monthlyWage ? Number(monthlyWage) : null,
@@ -125,6 +134,7 @@ export async function POST(req: NextRequest) {
         name: employee.name,
         email: employee.email,
         phone: employee.phone,
+        role: normalizeRole(employee.role),
         hourlyWage: employee.hourlyWage,
         monthlyWage: employee.monthlyWage,
         hireDate: employee.hireDate?.toISOString() ?? null,

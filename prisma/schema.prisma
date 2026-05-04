@@ -11,10 +11,11 @@ model Restaurant {
   id         String   @id @default(cuid())
   name       String
   address    String?
-  lat        Float?
-  lng        Float?
-  gpsRadius  Int      @default(50)
-  plan       Plan     @default(FREE)
+  lat            Float?
+  lng            Float?
+  gpsRadius      Int      @default(200)  // 기본값 50→200m 완화 (실내 GPS 오차 대응)
+  gpsEnforced    Boolean  @default(true) // false면 GPS 검증 우회 (오프라인/실내 등)
+  plan           Plan     @default(FREE)
   createdAt  DateTime @default(now())
 
   users            User[]
