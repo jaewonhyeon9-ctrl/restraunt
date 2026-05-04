@@ -45,15 +45,27 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: '사업장 정보를 찾을 수 없습니다.' }, { status: 400 })
   }
 
-  let body: { lat?: number; lng?: number; gpsRadius?: number; address?: string; gpsEnforced?: boolean }
+  let body: {
+    name?: string
+    lat?: number
+    lng?: number
+    gpsRadius?: number
+    address?: string
+    gpsEnforced?: boolean
+  }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 })
   }
 
-  const { lat, lng, gpsRadius, address, gpsEnforced } = body
+  const { name, lat, lng, gpsRadius, address, gpsEnforced } = body
 
+  if (name != null) {
+    if (typeof name !== 'string' || name.trim().length === 0 || name.trim().length > 60) {
+      return NextResponse.json({ error: '매장 이름은 1~60자 사이여야 합니다.' }, { status: 400 })
+    }
+  }
   if (lat != null && (typeof lat !== 'number' || lat < -90 || lat > 90)) {
     return NextResponse.json({ error: '위도 값이 올바르지 않습니다.' }, { status: 400 })
   }
@@ -70,6 +82,7 @@ export async function PATCH(req: NextRequest) {
   const updated = await prisma.restaurant.update({
     where: { id: restaurantId },
     data: {
+      ...(name != null && { name: name.trim() }),
       ...(lat != null && { lat }),
       ...(lng != null && { lng }),
       ...(gpsRadius != null && { gpsRadius }),

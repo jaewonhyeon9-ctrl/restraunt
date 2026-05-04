@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 
 interface RestaurantInfo {
   name: string
@@ -12,11 +14,17 @@ interface RestaurantInfo {
 }
 
 export default function RestaurantLocationCard() {
+  const router = useRouter()
+  const { update: updateSession } = useSession()
   const [info, setInfo] = useState<RestaurantInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [radiusInput, setRadiusInput] = useState<number>(50)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [createName, setCreateName] = useState('')
 
   useEffect(() => {
     const fetchInfo = async () => {
@@ -26,6 +34,7 @@ export default function RestaurantLocationCard() {
           const data: RestaurantInfo = await res.json()
           setInfo(data)
           setRadiusInput(data.gpsRadius ?? 50)
+          setNameInput(data.name ?? '')
         }
       } finally {
         setLoading(false)
@@ -33,6 +42,71 @@ export default function RestaurantLocationCard() {
     }
     fetchInfo()
   }, [])
+
+  const handleSaveName = async () => {
+    const trimmed = nameInput.trim()
+    if (trimmed.length === 0 || trimmed.length > 60) {
+      showMessage('error', '매장 이름은 1~60자 사이여야 합니다.')
+      return
+    }
+    if (trimmed === info?.name) {
+      setEditingName(false)
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/restaurant', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showMessage('error', data.error ?? '저장 실패')
+      } else {
+        setInfo(data)
+        setNameInput(data.name ?? '')
+        setEditingName(false)
+        showMessage('success', '매장 이름이 저장되었습니다.')
+        await updateSession()
+        router.refresh()
+      }
+    } catch {
+      showMessage('error', '네트워크 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCreateRestaurant = async () => {
+    const trimmed = createName.trim()
+    if (trimmed.length === 0) {
+      showMessage('error', '새 매장 이름을 입력해주세요.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/restaurants/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showMessage('error', data.error ?? '생성 실패')
+      } else {
+        showMessage('success', `"${data.restaurant.name}" 매장으로 전환되었습니다.`)
+        setCreateName('')
+        setShowCreate(false)
+        await updateSession()
+        router.refresh()
+      }
+    } catch {
+      showMessage('error', '네트워크 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text })
@@ -115,7 +189,7 @@ export default function RestaurantLocationCard() {
   return (
     <section className="glass-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-slate-200">📍 식당 위치</h2>
+        <h2 className="text-sm font-semibold text-slate-200">🏪 매장 정보</h2>
         <span
           className={`text-[11px] font-medium px-2 py-0.5 rounded-full ring-1 ${
             hasLocation
@@ -123,8 +197,52 @@ export default function RestaurantLocationCard() {
               : 'text-amber-300 bg-amber-500/10 ring-amber-400/30'
           }`}
         >
-          {hasLocation ? '설정됨' : '미설정'}
+          {hasLocation ? '위치 설정됨' : '위치 미설정'}
         </span>
+      </div>
+
+      {/* 매장 이름 (편집 가능) */}
+      <div className="mb-3 rounded-xl bg-white/5 ring-1 ring-white/5 px-3 py-2.5">
+        <p className="text-[10px] text-slate-500 mb-1">매장 이름</p>
+        {editingName ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              maxLength={60}
+              autoFocus
+              className="input-field !py-1.5 !text-sm flex-1"
+            />
+            <button
+              onClick={handleSaveName}
+              disabled={saving}
+              className="btn-ghost !px-3 !py-1.5 !text-xs disabled:opacity-40"
+            >
+              저장
+            </button>
+            <button
+              onClick={() => {
+                setEditingName(false)
+                setNameInput(info?.name ?? '')
+              }}
+              disabled={saving}
+              className="btn-ghost !px-2 !py-1.5 !text-xs"
+            >
+              취소
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-100 truncate">{info?.name ?? '-'}</p>
+            <button
+              onClick={() => setEditingName(true)}
+              className="text-[11px] text-blue-300 hover:text-blue-200 px-2 py-0.5 rounded-full bg-blue-500/10"
+            >
+              ✎ 변경
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl bg-white/5 ring-1 ring-white/5 px-3 py-2.5 mb-3 text-xs">
@@ -210,6 +328,53 @@ export default function RestaurantLocationCard() {
             }`}
           />
         </button>
+      </div>
+
+      {/* 새 매장 추가 (다점포) */}
+      <div className="mt-3 pt-3 border-t border-white/5">
+        {showCreate ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-slate-300">새 매장 추가</p>
+            <input
+              type="text"
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              placeholder="새 매장 이름 (예: 강남점)"
+              maxLength={60}
+              autoFocus
+              className="input-field !py-2 !text-sm w-full"
+            />
+            <p className="text-[10px] text-slate-500">
+              생성 후 이 카드에서 "현재 위치로 설정"을 눌러 위치를 등록하세요.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowCreate(false)
+                  setCreateName('')
+                }}
+                disabled={saving}
+                className="btn-ghost flex-1 !py-2 !text-xs"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleCreateRestaurant}
+                disabled={saving || createName.trim().length === 0}
+                className="btn-primary flex-1 !py-2 !text-xs disabled:opacity-40"
+              >
+                {saving ? '생성 중…' : '생성하고 전환'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="w-full rounded-xl border-2 border-dashed border-white/10 py-2.5 text-xs font-medium text-slate-400 hover:border-emerald-400/40 hover:text-emerald-300 transition-colors"
+          >
+            ➕ 새 매장 추가 (다점포)
+          </button>
+        )}
       </div>
 
       {message && (
