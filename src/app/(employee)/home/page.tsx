@@ -210,19 +210,38 @@ export default function EmployeeHomePage() {
           ) : geo.loading ? (
             <span className="text-xs text-gray-400">위치 확인 중...</span>
           ) : geo.error ? (
-            <span className="text-xs text-red-500">{geo.error}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-red-500">{geo.error}</span>
+              <button
+                type="button"
+                onClick={geo.refresh}
+                className="text-[11px] text-blue-600 hover:text-blue-800 px-1.5 py-0.5 rounded-full bg-blue-50 hover:bg-blue-100"
+              >
+                🔄 다시
+              </button>
+            </div>
           ) : (
-            <span
-              className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                geo.isWithinRange
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-orange-100 text-orange-600'
-              }`}
-            >
-              {geo.isWithinRange
-                ? '식당 반경 내'
-                : `${geo.distance != null ? Math.round(geo.distance) : '--'}m 이탈`}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  geo.isWithinRange
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-orange-100 text-orange-600'
+                }`}
+              >
+                {geo.isWithinRange
+                  ? `식당 반경 내 (±${Math.round(geo.accuracy ?? 0)}m)`
+                  : `${geo.distance != null ? Math.round(geo.distance) : '--'}m 이탈 (±${Math.round(geo.accuracy ?? 0)}m)`}
+              </span>
+              <button
+                type="button"
+                onClick={geo.refresh}
+                className="text-[11px] text-blue-600 hover:text-blue-800 px-1.5 py-0.5 rounded-full bg-blue-50 hover:bg-blue-100"
+                title="GPS 다시 잡기"
+              >
+                🔄 GPS 다시
+              </button>
+            </div>
           )}
         </div>
 

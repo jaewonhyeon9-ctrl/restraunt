@@ -136,12 +136,12 @@ export function RestaurantSwitcher() {
 
       {open && (
         <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40"
+          className="fixed inset-0 z-[60] flex sm:items-end items-stretch justify-center bg-black/40"
           onClick={() => !pending && setOpen(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white rounded-t-3xl flex flex-col max-h-[90dvh] overscroll-contain"
+            className="w-full sm:max-w-md bg-white sm:rounded-t-3xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90dvh] overscroll-contain"
           >
             {/* Header (sticky top) */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
