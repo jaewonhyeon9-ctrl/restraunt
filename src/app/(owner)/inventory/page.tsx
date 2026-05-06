@@ -74,6 +74,7 @@ export default function OwnerInventoryPage() {
   const [error, setError] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('name')
   const [groupMode, setGroupMode] = useState<GroupMode>('supplier')
+  const [editTarget, setEditTarget] = useState<InventoryItem | null>(null)
 
   const lowStockItems = items.filter(
     (item) => item.safetyStock !== null && item.currentStock <= item.safetyStock
@@ -107,37 +108,72 @@ export default function OwnerInventoryPage() {
     }
   }
 
-  async function handleAddItem(e: React.FormEvent) {
+  function openEdit(item: InventoryItem) {
+    setEditTarget(item)
+    setForm({
+      name: item.name,
+      manufacturer: item.manufacturer ?? '',
+      unit: item.unit,
+      unitPrice: item.unitPrice != null ? String(item.unitPrice) : '',
+      packageWeightG: item.packageWeightG != null ? String(item.packageWeightG) : '',
+      safetyStock: item.safetyStock != null ? String(item.safetyStock) : '',
+      currentStock: String(item.currentStock),
+      category: item.category ?? '',
+      supplierId: item.supplier?.id ?? '',
+    })
+    setError('')
+    setShowModal(true)
+  }
+
+  async function handleSubmitItem(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     setError('')
     try {
-      const res = await fetch('/api/inventory', {
-        method: 'POST',
+      const payload = {
+        name: form.name,
+        manufacturer: form.manufacturer || null,
+        unit: form.unit,
+        unitPrice: form.unitPrice ? Number(form.unitPrice) : null,
+        packageWeightG: form.packageWeightG ? Number(form.packageWeightG) : null,
+        safetyStock: form.safetyStock ? Number(form.safetyStock) : null,
+        currentStock: form.currentStock ? Number(form.currentStock) : 0,
+        category: form.category || null,
+        supplierId: form.supplierId || null,
+      }
+      const url = editTarget ? `/api/inventory/${editTarget.id}` : '/api/inventory'
+      const method = editTarget ? 'PATCH' : 'POST'
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name,
-          manufacturer: form.manufacturer || undefined,
-          unit: form.unit,
-          unitPrice: form.unitPrice ? Number(form.unitPrice) : undefined,
-          packageWeightG: form.packageWeightG ? Number(form.packageWeightG) : undefined,
-          safetyStock: form.safetyStock ? Number(form.safetyStock) : undefined,
-          currentStock: form.currentStock ? Number(form.currentStock) : 0,
-          category: form.category || undefined,
-          supplierId: form.supplierId || undefined,
-        }),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const err = await res.json()
-        throw new Error(err.error || '등록 실패')
+        throw new Error(err.error || '저장 실패')
       }
       setShowModal(false)
+      setEditTarget(null)
       setForm(EMPTY_FORM)
       fetchItems()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '등록 실패')
+      setError(err instanceof Error ? err.message : '저장 실패')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDeleteItem(item: InventoryItem) {
+    if (!confirm(`"${item.name}"을(를) 재고에서 삭제할까요?\n(데이터는 보존되며 목록에서만 사라집니다.)`)) return
+    try {
+      const res = await fetch(`/api/inventory/${item.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || '삭제 실패')
+      }
+      fetchItems()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '삭제 실패')
     }
   }
 
@@ -346,7 +382,8 @@ export default function OwnerInventoryPage() {
                   return (
                     <li
                       key={item.id}
-                      className={`px-3 py-2.5 grid grid-cols-12 gap-1 items-center text-xs ${
+                      onClick={() => openEdit(item)}
+                      className={`px-3 py-2.5 grid grid-cols-12 gap-1 items-center text-xs cursor-pointer hover:bg-orange-50/50 transition-colors ${
                         isLow ? 'bg-red-50' : ''
                       }`}
                     >
@@ -417,15 +454,18 @@ export default function OwnerInventoryPage() {
         </div>
       )}
 
-      {/* 품목 추가 모달 */}
+      {/* 품목 추가/수정 모달 */}
       {showModal && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
           <div className="w-full max-w-md bg-white rounded-t-2xl p-5 shadow-2xl max-h-[88dvh] overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+16px)] overscroll-contain">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">재고 품목 추가</h2>
+              <h2 className="text-lg font-bold text-gray-900">
+                {editTarget ? '재고 품목 수정' : '재고 품목 추가'}
+              </h2>
               <button
                 onClick={() => {
                   setShowModal(false)
+                  setEditTarget(null)
                   setForm(EMPTY_FORM)
                   setError('')
                 }}
@@ -441,7 +481,7 @@ export default function OwnerInventoryPage() {
               </div>
             )}
 
-            <form onSubmit={handleAddItem} className="space-y-3">
+            <form onSubmit={handleSubmitItem} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   품목명 <span className="text-red-500">*</span>
@@ -574,8 +614,26 @@ export default function OwnerInventoryPage() {
                 disabled={submitting}
                 className="w-full bg-orange-500 text-white font-semibold py-3 rounded-xl hover:bg-orange-600 disabled:opacity-50 transition-colors mt-2"
               >
-                {submitting ? '등록 중...' : '품목 등록'}
+                {submitting
+                  ? '저장 중...'
+                  : editTarget
+                  ? '수정 완료'
+                  : '품목 등록'}
               </button>
+              {editTarget && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDeleteItem(editTarget)
+                    setShowModal(false)
+                    setEditTarget(null)
+                    setForm(EMPTY_FORM)
+                  }}
+                  className="w-full text-xs text-red-500 hover:text-red-600 py-2"
+                >
+                  🗑 이 품목 삭제하기
+                </button>
+              )}
             </form>
           </div>
         </div>
