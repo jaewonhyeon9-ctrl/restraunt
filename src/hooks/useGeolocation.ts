@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { calculateDistance } from '@/lib/gps'
+import { checkInRange } from '@/lib/gps'
 
 interface GeolocationState {
   lat: number | null
@@ -36,20 +36,25 @@ export function useGeolocation(targetLat?: number, targetLng?: number, radius = 
       return
     }
 
+    const computeRange = (latitude: number, longitude: number, accuracy: number) => {
+      if (targetLat == null || targetLng == null) {
+        return { distance: null, isWithinRange: false }
+      }
+      const result = checkInRange(latitude, longitude, targetLat, targetLng, radius, accuracy)
+      return { distance: result.distance, isWithinRange: result.ok }
+    }
+
     // 1) 즉시 한 번 — 신선한 GPS (refresh 트리거 시 maximumAge: 0)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords
-        const distance =
-          targetLat != null && targetLng != null
-            ? calculateDistance(latitude, longitude, targetLat, targetLng)
-            : null
+        const { distance, isWithinRange } = computeRange(latitude, longitude, accuracy)
         setState({
           lat: latitude,
           lng: longitude,
           distance,
           accuracy,
-          isWithinRange: distance != null ? distance <= radius : false,
+          isWithinRange,
           error: null,
           loading: false,
         })
@@ -68,17 +73,13 @@ export function useGeolocation(targetLat?: number, targetLng?: number, radius = 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords
-        const distance =
-          targetLat != null && targetLng != null
-            ? calculateDistance(latitude, longitude, targetLat, targetLng)
-            : null
-
+        const { distance, isWithinRange } = computeRange(latitude, longitude, accuracy)
         setState({
           lat: latitude,
           lng: longitude,
           distance,
           accuracy,
-          isWithinRange: distance != null ? distance <= radius : false,
+          isWithinRange,
           error: null,
           loading: false,
         })

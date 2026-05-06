@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { calculateDistance } from '@/lib/gps'
+import { checkInRange } from '@/lib/gps'
 import { calcDailyWage } from '@/lib/wage-calculator'
 
 // GET: 오늘 출퇴근 상태 조회
@@ -50,33 +50,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '사업장 정보를 찾을 수 없습니다.' }, { status: 400 })
   }
 
-  let body: { type: 'in' | 'out'; lat: number; lng: number }
+  let body: { type: 'in' | 'out'; lat: number; lng: number; accuracy?: number }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 })
   }
 
-  const { type, lat, lng } = body
+  const { type, lat, lng, accuracy } = body
   if (!type || typeof lat !== 'number' || typeof lng !== 'number') {
     return NextResponse.json({ error: '필수 값이 누락되었습니다.' }, { status: 400 })
   }
 
-  // 서버측 GPS 검증
+  // 서버측 GPS 검증 (정확도 반영)
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
     select: { lat: true, lng: true, gpsRadius: true, gpsEnforced: true },
   })
 
   if (restaurant?.gpsEnforced !== false && restaurant?.lat && restaurant?.lng) {
-    const distance = calculateDistance(lat, lng, restaurant.lat, restaurant.lng)
     const radius = restaurant.gpsRadius ?? 200
-    if (distance > radius) {
+    const result = checkInRange(lat, lng, restaurant.lat, restaurant.lng, radius, accuracy)
+    if (!result.ok) {
+      const accuracyText =
+        typeof accuracy === 'number' && accuracy > 0
+          ? ` (GPS 정확도 ±${Math.round(accuracy)}m 반영해 ${Math.round(result.allowedDistance)}m까지 허용)`
+          : ''
       return NextResponse.json(
         {
           error:
-            `식당 반경 ${radius}m 이내에서만 출퇴근이 가능합니다. (현재 ${Math.round(distance)}m). ` +
-            `실내라면 입구나 창가에서 시도하거나, 사장님께 GPS 검증 우회를 요청하세요.`,
+            `식당 반경 ${radius}m 이내에서만 출퇴근이 가능합니다. ` +
+            `현재 거리 ${Math.round(result.distance)}m${accuracyText}. ` +
+            `실내라면 입구·창가로 이동 후 다시 시도하거나, 사장님께 GPS 검증 우회를 요청하세요.`,
         },
         { status: 400 }
       )

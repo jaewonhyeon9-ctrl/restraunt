@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useGeolocation } from '@/hooks/useGeolocation'
-import { calculateDistance } from '@/lib/gps'
+import { checkInRange } from '@/lib/gps'
 
 interface AttendanceStatus {
   clockIn: string | null
@@ -146,14 +146,23 @@ export default function EmployeeHomePage() {
         return
       }
 
-      // 2단계: 식당 반경 체크 (즉시 피드백)
+      // 2단계: 식당 반경 체크 (정확도 반영, 즉시 피드백)
       if (restaurant?.lat != null && restaurant?.lng != null) {
-        const dist = calculateDistance(fresh.lat, fresh.lng, restaurant.lat, restaurant.lng)
-        const radius = restaurant.gpsRadius ?? 50
-        if (dist > radius) {
+        const radius = restaurant.gpsRadius ?? 200
+        const result = checkInRange(
+          fresh.lat,
+          fresh.lng,
+          restaurant.lat,
+          restaurant.lng,
+          radius,
+          fresh.accuracy
+        )
+        if (!result.ok) {
           setError(
             `식당 반경 ${radius}m 이내에서만 출퇴근이 가능합니다. ` +
-              `현재 거리 ${Math.round(dist)}m (정확도 ±${Math.round(fresh.accuracy)}m)`
+              `현재 거리 ${Math.round(result.distance)}m ` +
+              `(정확도 ±${Math.round(fresh.accuracy)}m 반영해 ${Math.round(result.allowedDistance)}m까지 허용). ` +
+              `창가/출입구로 이동 후 🔄 GPS 다시 시도해보세요.`
           )
           return
         }
@@ -163,7 +172,12 @@ export default function EmployeeHomePage() {
       const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, lat: fresh.lat, lng: fresh.lng }),
+        body: JSON.stringify({
+          type,
+          lat: fresh.lat,
+          lng: fresh.lng,
+          accuracy: fresh.accuracy,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
