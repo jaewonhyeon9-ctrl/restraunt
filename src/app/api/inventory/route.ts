@@ -56,7 +56,17 @@ export async function POST(request: NextRequest) {
   const restaurantId = (session.user as any).restaurantId as string
 
   const body = await request.json()
-  const { name, unit, unitPrice, safetyStock, currentStock, category, supplierId } = body
+  const {
+    name,
+    unit,
+    unitPrice,
+    safetyStock,
+    currentStock,
+    category,
+    supplierId,
+    manufacturer,
+    packageWeightG,
+  } = body
 
   if (!name || !unit) {
     return NextResponse.json({ error: '품목명과 단위는 필수입니다.' }, { status: 400 })
@@ -72,6 +82,8 @@ export async function POST(request: NextRequest) {
       currentStock: currentStock ? Number(currentStock) : 0,
       category: category || null,
       supplierId: supplierId || null,
+      manufacturer: manufacturer?.trim() || null,
+      packageWeightG: packageWeightG ? Number(packageWeightG) : null,
     },
     include: {
       supplier: { select: { id: true, name: true } },

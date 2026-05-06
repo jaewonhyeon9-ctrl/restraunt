@@ -87,6 +87,20 @@ export async function POST(req: NextRequest) {
       row['supplier'] ??
       row['Supplier'] ??
       null,
+    manufacturer:
+      row['제조사'] ??
+      row['제조사명'] ??
+      row['브랜드'] ??
+      row['manufacturer'] ??
+      row['Manufacturer'] ??
+      null,
+    packageWeightG:
+      row['패키지중량'] ??
+      row['패키지중량(g)'] ??
+      row['중량g'] ??
+      row['중량(g)'] ??
+      row['packageWeightG'] ??
+      null,
   })
 
   // Look up suppliers by name to resolve IDs
@@ -106,6 +120,8 @@ export async function POST(req: NextRequest) {
     currentStock: number
     category: string | null
     supplierId: string | null
+    manufacturer: string | null
+    packageWeightG: number | null
   }
 
   const parsed: ParsedRow[] = []
@@ -147,6 +163,10 @@ export async function POST(req: NextRequest) {
       currentStock: toNumber(mapped.currentStock) ?? 0,
       category: mapped.category ? String(mapped.category).trim() || null : null,
       supplierId,
+      manufacturer: mapped.manufacturer
+        ? String(mapped.manufacturer).trim() || null
+        : null,
+      packageWeightG: toNumber(mapped.packageWeightG),
     })
   })
 
@@ -190,6 +210,8 @@ export async function POST(req: NextRequest) {
               currentStock: p.currentStock,
               category: p.category,
               supplierId: p.supplierId,
+              manufacturer: p.manufacturer,
+              packageWeightG: p.packageWeightG,
             },
           })
           updated++
@@ -207,6 +229,8 @@ export async function POST(req: NextRequest) {
             currentStock: p.currentStock,
             category: p.category,
             supplierId: p.supplierId,
+            manufacturer: p.manufacturer,
+            packageWeightG: p.packageWeightG,
           },
         })
         created++

@@ -315,17 +315,19 @@ model Supplier {
 
 // 재고 마스터
 model InventoryItem {
-  id           String   @id @default(cuid())
-  restaurantId String
-  supplierId   String?
-  name         String
-  unit         String
-  unitPrice    Float?
-  safetyStock  Float?
-  currentStock Float    @default(0)
-  category     String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  restaurantId   String
+  supplierId     String?
+  name           String
+  manufacturer   String?  // 제조사명
+  unit           String
+  unitPrice      Float?
+  packageWeightG Float?   // 패키지 1개당 중량(g) — 10g당 가격 환산용
+  safetyStock    Float?
+  currentStock   Float    @default(0)
+  category       String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
   restaurant     Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   supplier       Supplier?           @relation(fields: [supplierId], references: [id])
