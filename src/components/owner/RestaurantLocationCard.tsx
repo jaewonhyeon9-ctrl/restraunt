@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { acquireBestLocation } from '@/lib/gps-client'
 
 interface RestaurantInfo {
   name: string
@@ -82,41 +83,45 @@ export default function RestaurantLocationCard() {
     setTimeout(() => setMessage(null), 3000)
   }
 
-  const handleSetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      showMessage('error', 'GPS를 지원하지 않는 기기입니다.')
-      return
-    }
-
+  const handleSetCurrentLocation = async () => {
     setSaving(true)
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords
-        try {
-          const res = await fetch('/api/restaurant', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lat: latitude, lng: longitude }),
-          })
-          const data = await res.json()
-          if (!res.ok) {
-            showMessage('error', data.error ?? '저장에 실패했습니다.')
-          } else {
-            setInfo(data)
-            showMessage('success', '식당 위치가 저장되었습니다.')
-          }
-        } catch {
-          showMessage('error', '네트워크 오류가 발생했습니다.')
-        } finally {
-          setSaving(false)
-        }
-      },
-      (err) => {
-        showMessage('error', err.code === 1 ? 'GPS 권한을 허용해주세요.' : 'GPS 오류가 발생했습니다.')
-        setSaving(false)
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+    try {
+      const fix = await acquireBestLocation()
+
+      // 매장 기준점은 모든 직원 출퇴근의 기준이므로 정확도 ±100m 초과는 거부
+      if (fix.accuracy > 100) {
+        showMessage(
+          'error',
+          `GPS 정확도가 너무 낮아요 (±${Math.round(fix.accuracy)}m). 매장 탭에서 지도로 정확히 지정해주세요.`
+        )
+        return
+      }
+
+      const res = await fetch('/api/restaurant', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: fix.lat, lng: fix.lng }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showMessage('error', data.error ?? '저장에 실패했습니다.')
+        return
+      }
+      setInfo(data)
+      // 30~100m 사이는 저장하되 경고
+      if (fix.accuracy > 30) {
+        showMessage(
+          'error',
+          `저장됨 (정확도 ±${Math.round(fix.accuracy)}m, ${fix.samples}회 측정). 정확하지 않다면 매장 탭에서 지도로 다시 설정하세요.`
+        )
+      } else {
+        showMessage('success', `식당 위치가 저장되었습니다. (정확도 ±${Math.round(fix.accuracy)}m)`)
+      }
+    } catch (e) {
+      showMessage('error', e instanceof Error ? e.message : 'GPS 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleSaveRadius = async () => {

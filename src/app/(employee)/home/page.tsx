@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { checkInRange } from '@/lib/gps'
+import { acquireBestLocation } from '@/lib/gps-client'
 
 interface AttendanceStatus {
   clockIn: string | null
@@ -47,7 +48,36 @@ export default function EmployeeHomePage() {
   const [checklist, setChecklist] = useState<ChecklistPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastFailContext, setLastFailContext] = useState<{
+    type: 'in' | 'out'
+    distance?: number
+    accuracy?: number
+  } | null>(null)
+  const [bypassRequested, setBypassRequested] = useState(false)
   const [now, setNow] = useState(new Date())
+
+  async function requestBypass() {
+    if (!lastFailContext) return
+    setBypassRequested(true)
+    try {
+      const res = await fetch('/api/attendance/request-bypass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lastFailContext),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? '요청 전송 실패. 직접 전화로 연락하세요.')
+        setBypassRequested(false)
+      } else if (data.sent === 0) {
+        setError('사장님이 푸시 알림을 켜지 않으셨어요. 직접 연락하세요.')
+        setBypassRequested(false)
+      }
+    } catch {
+      setError('네트워크 오류. 다시 시도해주세요.')
+      setBypassRequested(false)
+    }
+  }
 
   useEffect(() => {
     const fetchRestaurant = async () => {
@@ -103,27 +133,6 @@ export default function EmployeeHomePage() {
     fetchChecklist()
   }, [fetchAttendance, fetchChecklist])
 
-  // 클릭 시점에 GPS 재측정 (정확도 우선)
-  const acquireFreshLocation = (): Promise<{ lat: number; lng: number; accuracy: number }> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('GPS를 지원하지 않는 기기'))
-        return
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          resolve({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          })
-        },
-        (err) => reject(new Error(err.message || '위치를 가져올 수 없어요')),
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-      )
-    })
-  }
-
   const handleAttendance = async (type: 'in' | 'out') => {
     if (restaurant && (restaurant.lat == null || restaurant.lng == null)) {
       setError('사장님이 아직 식당 위치를 설정하지 않았습니다.')
@@ -131,13 +140,15 @@ export default function EmployeeHomePage() {
     }
 
     setError(null)
+    setLastFailContext(null)
+    setBypassRequested(false)
     setLoading(true)
 
     try {
-      // 1단계: 클릭 시점 신선한 GPS 측정
-      let fresh: { lat: number; lng: number; accuracy: number }
+      // 1단계: 클릭 시점 다중 측정 GPS (3초간 watchPosition으로 가장 정확한 값 선택)
+      let fresh: { lat: number; lng: number; accuracy: number; samples: number }
       try {
-        fresh = await acquireFreshLocation()
+        fresh = await acquireBestLocation()
       } catch (e) {
         setError(
           (e instanceof Error ? e.message : '') +
@@ -164,6 +175,7 @@ export default function EmployeeHomePage() {
               `(정확도 ±${Math.round(fresh.accuracy)}m 반영해 ${Math.round(result.allowedDistance)}m까지 허용). ` +
               `창가/출입구로 이동 후 🔄 GPS 다시 시도해보세요.`
           )
+          setLastFailContext({ type, distance: result.distance, accuracy: fresh.accuracy })
           return
         }
       }
@@ -182,6 +194,7 @@ export default function EmployeeHomePage() {
       const data = await res.json()
       if (!res.ok) {
         setError(data.error ?? '처리 중 오류가 발생했습니다.')
+        setLastFailContext({ type, accuracy: fresh.accuracy })
       } else {
         await fetchAttendance()
       }
@@ -272,7 +285,7 @@ export default function EmployeeHomePage() {
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}
           >
-            {hasClockIn ? `출근 ${formatTime(attendance?.clockIn ?? null)}` : '출근'}
+            {loading ? '📡 측정 중...' : hasClockIn ? `출근 ${formatTime(attendance?.clockIn ?? null)}` : '출근'}
           </button>
           <button
             onClick={() => handleAttendance('out')}
@@ -285,12 +298,30 @@ export default function EmployeeHomePage() {
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}
           >
-            {hasClockOut ? `퇴근 ${formatTime(attendance?.clockOut ?? null)}` : '퇴근'}
+            {loading ? '📡 측정 중...' : hasClockOut ? `퇴근 ${formatTime(attendance?.clockOut ?? null)}` : '퇴근'}
           </button>
         </div>
 
         {error && (
-          <p className="mt-2 text-xs text-red-500 text-center">{error}</p>
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-red-500 text-center">{error}</p>
+            {lastFailContext && (
+              <button
+                type="button"
+                onClick={requestBypass}
+                disabled={bypassRequested}
+                className={`w-full py-2 rounded-xl text-xs font-medium transition-colors ${
+                  bypassRequested
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                }`}
+              >
+                {bypassRequested
+                  ? '✓ 사장님께 알림 보냈어요'
+                  : '📨 사장님께 GPS 우회 요청 보내기'}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
