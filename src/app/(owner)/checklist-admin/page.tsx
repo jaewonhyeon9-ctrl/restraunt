@@ -13,6 +13,8 @@ interface Template {
   scheduledTime: string | null
   sortOrder: number
   isActive: boolean
+  requiresPhoto: boolean
+  requiredOnClockOut: boolean
 }
 
 const PRESET_SLOTS = ['오픈 전', '오전', '점심', '브레이크', '저녁', '마감']
@@ -32,7 +34,16 @@ export default function ChecklistAdminPage() {
     description: string
     timeSlot: string
     scheduledTime: string
-  }>({ title: '', description: '', timeSlot: '오픈 전', scheduledTime: '' })
+    requiresPhoto: boolean
+    requiredOnClockOut: boolean
+  }>({
+    title: '',
+    description: '',
+    timeSlot: '오픈 전',
+    scheduledTime: '',
+    requiresPhoto: false,
+    requiredOnClockOut: false,
+  })
   const [submitting, setSubmitting] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -78,6 +89,8 @@ export default function ChecklistAdminPage() {
           category: activeCategory,
           timeSlot: form.timeSlot,
           scheduledTime: form.scheduledTime || null,
+          requiresPhoto: form.requiresPhoto,
+          requiredOnClockOut: form.requiredOnClockOut,
         }),
       })
       const json = await res.json()
@@ -85,11 +98,38 @@ export default function ChecklistAdminPage() {
         flash('error', json.error ?? '등록 실패')
       } else {
         flash('success', '항목이 추가되었습니다.')
-        setForm({ ...form, title: '', description: '', scheduledTime: '' })
+        setForm({
+          ...form,
+          title: '',
+          description: '',
+          scheduledTime: '',
+          requiresPhoto: false,
+          requiredOnClockOut: false,
+        })
         fetchItems()
       }
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleToggleField = async (
+    id: string,
+    field: 'requiresPhoto' | 'requiredOnClockOut',
+    value: boolean,
+  ) => {
+    const res = await fetch(`/api/checklist/templates/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    })
+    if (res.ok) {
+      setItems((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
+      )
+    } else {
+      const json = await res.json().catch(() => ({}))
+      flash('error', json.error ?? '저장 실패')
     }
   }
 
@@ -303,6 +343,45 @@ export default function ChecklistAdminPage() {
               />
             </div>
 
+            {/* 사진 인증 + 퇴근 필수 토글 */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setForm({ ...form, requiresPhoto: !form.requiresPhoto })
+                }
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg ring-1 text-xs transition ${
+                  form.requiresPhoto
+                    ? 'bg-amber-500/15 ring-amber-400/40 text-amber-200'
+                    : 'bg-white/5 ring-white/5 text-slate-400'
+                }`}
+              >
+                <span>📷 사진 인증</span>
+                <span className="text-[10px] font-bold">
+                  {form.requiresPhoto ? 'ON' : 'OFF'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    requiredOnClockOut: !form.requiredOnClockOut,
+                  })
+                }
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg ring-1 text-xs transition ${
+                  form.requiredOnClockOut
+                    ? 'bg-rose-500/15 ring-rose-400/40 text-rose-200'
+                    : 'bg-white/5 ring-white/5 text-slate-400'
+                }`}
+              >
+                <span>⏰ 퇴근 필수</span>
+                <span className="text-[10px] font-bold">
+                  {form.requiredOnClockOut ? 'ON' : 'OFF'}
+                </span>
+              </button>
+            </div>
+
             <button
               type="submit"
               disabled={submitting}
@@ -467,36 +546,70 @@ export default function ChecklistAdminPage() {
                     {list.map((t) => (
                       <li
                         key={t.id}
-                        className="flex items-start justify-between gap-2 rounded-lg bg-white/5 ring-1 ring-white/5 px-3 py-2"
+                        className="rounded-lg bg-white/5 ring-1 ring-white/5 px-3 py-2 space-y-1.5"
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {t.scheduledTime && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 font-mono font-semibold tabular-nums">
-                                {t.scheduledTime}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {t.scheduledTime && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 font-mono font-semibold tabular-nums">
+                                  {t.scheduledTime}
+                                </span>
+                              )}
+                              {t.timeSlot && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 font-medium">
+                                  {t.timeSlot}
+                                </span>
+                              )}
+                              <span className="text-sm font-medium text-slate-100">
+                                {t.title}
                               </span>
+                            </div>
+                            {t.description && (
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {t.description}
+                              </p>
                             )}
-                            {t.timeSlot && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 font-medium">
-                                {t.timeSlot}
-                              </span>
-                            )}
-                            <span className="text-sm font-medium text-slate-100">
-                              {t.title}
-                            </span>
                           </div>
-                          {t.description && (
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              {t.description}
-                            </p>
-                          )}
+                          <button
+                            onClick={() => handleDelete(t.id)}
+                            className="text-xs text-rose-300 hover:text-rose-200 px-2 py-1 rounded hover:bg-rose-500/10"
+                          >
+                            삭제
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleDelete(t.id)}
-                          className="text-xs text-rose-300 hover:text-rose-200 px-2 py-1 rounded hover:bg-rose-500/10"
-                        >
-                          삭제
-                        </button>
+
+                        {/* 인라인 토글 */}
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() =>
+                              handleToggleField(t.id, 'requiresPhoto', !t.requiresPhoto)
+                            }
+                            className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition ${
+                              t.requiresPhoto
+                                ? 'bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/40'
+                                : 'bg-white/5 text-slate-500'
+                            }`}
+                          >
+                            📷 사진 인증 {t.requiresPhoto ? 'ON' : 'OFF'}
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleToggleField(
+                                t.id,
+                                'requiredOnClockOut',
+                                !t.requiredOnClockOut,
+                              )
+                            }
+                            className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition ${
+                              t.requiredOnClockOut
+                                ? 'bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/40'
+                                : 'bg-white/5 text-slate-500'
+                            }`}
+                          >
+                            ⏰ 퇴근 필수 {t.requiredOnClockOut ? 'ON' : 'OFF'}
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>

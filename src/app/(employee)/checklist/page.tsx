@@ -36,8 +36,11 @@ interface ChecklistItem {
   timeSlot: string | null
   scheduledTime: string | null
   sortOrder: number
+  requiresPhoto: boolean
+  requiredOnClockOut: boolean
   isChecked: boolean
   checkedAt: string | null
+  photoUrl: string | null
 }
 
 const CATEGORY_META: Record<Category, { label: string; icon: string }> = {
@@ -58,6 +61,9 @@ export default function ChecklistPage() {
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState<Set<string>>(new Set())
   const [activeCategory, setActiveCategory] = useState<Category>('KITCHEN')
+  const [uploading, setUploading] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const pendingPhotoTemplateRef = useRef<string | null>(null)
 
   // 게임화 상태
   const [toast, setToast] = useState<MissionToastData | null>(null)
@@ -147,15 +153,16 @@ export default function ChecklistPage() {
     []
   )
 
-  const handleCheck = async (templateId: string, current: boolean) => {
-    if (checking.has(templateId)) return
+  const submitCheck = async (
+    templateId: string,
+    nextChecked: boolean,
+    photoUrl?: string | null,
+  ) => {
     setChecking((prev) => new Set(prev).add(templateId))
 
-    // 체크(미완료 → 완료)일 때만 연출 트리거
-    const willComplete = !current
-    if (willComplete) {
+    if (nextChecked) {
       const target = items.find((i) => i.templateId === templateId)
-      if (target) triggerMissionToast(target.category, willComplete, items)
+      if (target) triggerMissionToast(target.category, true, items)
     }
 
     setItems((prev) =>
@@ -163,35 +170,41 @@ export default function ChecklistPage() {
         item.templateId === templateId
           ? {
               ...item,
-              isChecked: !current,
-              checkedAt: !current ? new Date().toISOString() : null,
+              isChecked: nextChecked,
+              checkedAt: nextChecked ? new Date().toISOString() : null,
+              ...(photoUrl !== undefined && { photoUrl: photoUrl ?? null }),
             }
-          : item
-      )
+          : item,
+      ),
     )
 
     try {
       const res = await fetch('/api/checklist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId, isChecked: !current }),
+        body: JSON.stringify({
+          templateId,
+          isChecked: nextChecked,
+          ...(photoUrl !== undefined && { photoUrl }),
+        }),
       })
       if (!res.ok) {
+        // rollback
         setItems((prev) =>
           prev.map((item) =>
             item.templateId === templateId
-              ? { ...item, isChecked: current }
-              : item
-          )
+              ? { ...item, isChecked: !nextChecked }
+              : item,
+          ),
         )
       }
     } catch {
       setItems((prev) =>
         prev.map((item) =>
           item.templateId === templateId
-            ? { ...item, isChecked: current }
-            : item
-        )
+            ? { ...item, isChecked: !nextChecked }
+            : item,
+        ),
       )
     } finally {
       setChecking((prev) => {
@@ -199,6 +212,52 @@ export default function ChecklistPage() {
         next.delete(templateId)
         return next
       })
+    }
+  }
+
+  const handleCheck = async (templateId: string, current: boolean) => {
+    if (checking.has(templateId)) return
+
+    const target = items.find((i) => i.templateId === templateId)
+    if (!target) return
+
+    // 사진 인증 필수 항목 + 체크하려는 경우 + 아직 사진 없을 때 → 카메라 열기
+    if (!current && target.requiresPhoto && !target.photoUrl) {
+      pendingPhotoTemplateRef.current = templateId
+      fileInputRef.current?.click()
+      return
+    }
+
+    await submitCheck(templateId, !current)
+  }
+
+  const handlePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // 같은 파일 재선택 가능하게
+    const templateId = pendingPhotoTemplateRef.current
+    pendingPhotoTemplateRef.current = null
+    if (!file || !templateId) return
+
+    setUploading(templateId)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/upload/checklist-photo', {
+        method: 'POST',
+        body: fd,
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        alert(json.error ?? '사진 업로드 실패')
+        return
+      }
+      const json = await res.json()
+      // 업로드 성공 → 체크 + 사진 URL 저장
+      await submitCheck(templateId, true, json.url)
+    } catch {
+      alert('사진 업로드 중 오류가 발생했습니다.')
+    } finally {
+      setUploading(null)
     }
   }
 
@@ -261,6 +320,16 @@ export default function ChecklistPage() {
   return (
     <div className="px-4 pt-5 pb-6 space-y-4">
       <MissionClearToast toast={toast} onDone={() => setToast(null)} />
+
+      {/* 사진 업로드용 숨겨진 input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handlePhotoSelected}
+        className="hidden"
+      />
 
       {/* 레벨/XP 바 */}
       <div className="rounded-2xl bg-gradient-to-br from-indigo-500/15 to-violet-500/10 ring-1 ring-indigo-400/30 p-3">
@@ -376,7 +445,8 @@ export default function ChecklistPage() {
                   />
                 )}
                 {slotItems.map((item) => {
-                  const isProcessing = checking.has(item.templateId)
+                  const isProcessing =
+                    checking.has(item.templateId) || uploading === item.templateId
                   return (
                     <button
                       key={item.templateId}
@@ -387,6 +457,8 @@ export default function ChecklistPage() {
                       className={`relative w-full text-left rounded-xl p-3.5 ring-1 transition active:scale-[0.99] ${
                         item.isChecked
                           ? 'bg-emerald-500/10 ring-emerald-400/30'
+                          : item.requiresPhoto && !item.photoUrl
+                          ? 'bg-amber-500/5 ring-amber-400/20'
                           : 'bg-white/5 ring-white/10 hover:ring-white/20'
                       } ${isProcessing ? 'opacity-60' : ''}`}
                     >
@@ -430,18 +502,35 @@ export default function ChecklistPage() {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <p
-                            className={`text-sm font-medium leading-snug ${
-                              item.isChecked
-                                ? 'text-slate-500 line-through'
-                                : 'text-slate-100'
-                            }`}
-                          >
-                            {item.title}
-                          </p>
+                          <div className="flex items-center gap-1 flex-wrap mb-0.5">
+                            <p
+                              className={`text-sm font-medium leading-snug ${
+                                item.isChecked
+                                  ? 'text-slate-500 line-through'
+                                  : 'text-slate-100'
+                              }`}
+                            >
+                              {item.title}
+                            </p>
+                            {item.requiresPhoto && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-200 font-bold">
+                                📷 사진
+                              </span>
+                            )}
+                            {item.requiredOnClockOut && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-200 font-bold">
+                                ⏰ 퇴근필수
+                              </span>
+                            )}
+                          </div>
                           {item.description && (
                             <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
                               {item.description}
+                            </p>
+                          )}
+                          {uploading === item.templateId && (
+                            <p className="text-[11px] text-amber-300 mt-1 animate-pulse">
+                              📡 사진 업로드 중...
                             </p>
                           )}
                           {item.isChecked && item.checkedAt && (
@@ -452,6 +541,20 @@ export default function ChecklistPage() {
                               })}{' '}
                               완료
                             </p>
+                          )}
+                          {item.photoUrl && (
+                            <div className="mt-2">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={item.photoUrl}
+                                alt="인증 사진"
+                                className="rounded-lg max-h-32 ring-1 ring-white/10"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  window.open(item.photoUrl ?? '', '_blank')
+                                }}
+                              />
+                            </div>
                           )}
                         </div>
                       </div>

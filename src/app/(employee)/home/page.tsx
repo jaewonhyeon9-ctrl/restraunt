@@ -145,6 +145,38 @@ export default function EmployeeHomePage() {
     setLoading(true)
 
     try {
+      // 0단계: 퇴근 시 필수 체크리스트 미완료 검증
+      if (type === 'out') {
+        try {
+          const checkRes = await fetch('/api/checklist')
+          if (checkRes.ok) {
+            const checkData = (await checkRes.json()) as Array<{
+              templateId: string
+              title: string
+              isChecked: boolean
+              requiredOnClockOut: boolean
+            }>
+            const missing = checkData.filter(
+              (c) => c.requiredOnClockOut && !c.isChecked,
+            )
+            if (missing.length > 0) {
+              setError(
+                `퇴근 전 필수 체크리스트 ${missing.length}개 미완료: ` +
+                  missing
+                    .slice(0, 3)
+                    .map((m) => m.title)
+                    .join(', ') +
+                  (missing.length > 3 ? ` 외 ${missing.length - 3}개` : '') +
+                  '. 체크리스트 화면에서 먼저 완료해주세요.',
+              )
+              return
+            }
+          }
+        } catch {
+          // 체크리스트 조회 실패해도 퇴근 자체는 진행
+        }
+      }
+
       // 1단계: 클릭 시점 다중 측정 GPS (3초간 watchPosition으로 가장 정확한 값 선택)
       let fresh: { lat: number; lng: number; accuracy: number; samples: number }
       try {

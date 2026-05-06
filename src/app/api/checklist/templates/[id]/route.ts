@@ -38,6 +38,8 @@ export async function PATCH(
     scheduledTime?: string | null
     sortOrder?: number
     isActive?: boolean
+    requiresPhoto?: boolean
+    requiredOnClockOut?: boolean
   }
   try {
     body = await req.json()
@@ -63,6 +65,8 @@ export async function PATCH(
     scheduledTime?: string | null
     sortOrder?: number
     isActive?: boolean
+    requiresPhoto?: boolean
+    requiredOnClockOut?: boolean
   } = {}
   if (body.title !== undefined) {
     const t = body.title.trim()
@@ -99,6 +103,8 @@ export async function PATCH(
   }
   if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder
   if (body.isActive !== undefined) data.isActive = body.isActive
+  if (body.requiresPhoto !== undefined) data.requiresPhoto = body.requiresPhoto
+  if (body.requiredOnClockOut !== undefined) data.requiredOnClockOut = body.requiredOnClockOut
 
   const updated = await prisma.checklistTemplate.update({
     where: { id },

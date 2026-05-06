@@ -70,8 +70,11 @@ export async function GET(req: NextRequest) {
       timeSlot: template.timeSlot,
       scheduledTime: template.scheduledTime,
       sortOrder: template.sortOrder,
+      requiresPhoto: template.requiresPhoto,
+      requiredOnClockOut: template.requiredOnClockOut,
       isChecked: log?.isChecked ?? false,
       checkedAt: log?.checkedAt?.toISOString() ?? null,
+      photoUrl: log?.photoUrl ?? null,
     }
   })
 
@@ -91,14 +94,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '사업장 정보를 찾을 수 없습니다.' }, { status: 400 })
   }
 
-  let body: { templateId: string; isChecked: boolean }
+  let body: { templateId: string; isChecked: boolean; photoUrl?: string | null }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 })
   }
 
-  const { templateId, isChecked } = body
+  const { templateId, isChecked, photoUrl } = body
   if (!templateId || typeof isChecked !== 'boolean') {
     return NextResponse.json({ error: '필수 값이 누락되었습니다.' }, { status: 400 })
   }
@@ -109,6 +112,14 @@ export async function POST(req: NextRequest) {
   })
   if (!template) {
     return NextResponse.json({ error: '존재하지 않는 체크리스트 항목입니다.' }, { status: 404 })
+  }
+
+  // 사진 인증 필수인데 photoUrl 없이 체크 시도하면 거부
+  if (isChecked && template.requiresPhoto && !photoUrl) {
+    return NextResponse.json(
+      { error: '이 항목은 사진 인증이 필요합니다. 사진을 먼저 첨부하세요.' },
+      { status: 400 }
+    )
   }
 
   const today = new Date()
@@ -126,10 +137,12 @@ export async function POST(req: NextRequest) {
       date: today,
       isChecked,
       checkedAt: isChecked ? now : null,
+      photoUrl: photoUrl ?? null,
     },
     update: {
       isChecked,
       checkedAt: isChecked ? now : null,
+      ...(photoUrl !== undefined && { photoUrl }),
     },
   })
 
@@ -137,5 +150,6 @@ export async function POST(req: NextRequest) {
     templateId: log.templateId,
     isChecked: log.isChecked,
     checkedAt: log.checkedAt?.toISOString() ?? null,
+    photoUrl: log.photoUrl,
   })
 }

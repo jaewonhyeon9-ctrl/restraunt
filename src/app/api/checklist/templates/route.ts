@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
     timeSlot?: string | null
     scheduledTime?: string | null
     sortOrder?: number
+    requiresPhoto?: boolean
+    requiredOnClockOut?: boolean
   }
   try {
     body = await req.json()
@@ -101,6 +103,8 @@ export async function POST(req: NextRequest) {
       timeSlot: body.timeSlot?.trim() || null,
       scheduledTime,
       sortOrder: body.sortOrder ?? 0,
+      requiresPhoto: body.requiresPhoto ?? false,
+      requiredOnClockOut: body.requiredOnClockOut ?? false,
     },
   })
 
