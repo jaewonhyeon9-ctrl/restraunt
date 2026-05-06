@@ -8,6 +8,8 @@ const bodySchema = z.object({
   address: z.string().max(120).nullish(),
   lat: z.number().min(-90).max(90).nullish(),
   lng: z.number().min(-180).max(180).nullish(),
+  gpsRadius: z.number().int().min(10).max(2000).nullish(),
+  gpsEnforced: z.boolean().nullish(),
 })
 
 /** 새 매장 생성 — 현재 사용자가 자동으로 OWNER + 활성 매장으로 전환 */
@@ -50,6 +52,8 @@ export async function POST(req: NextRequest) {
         address: parsed.data.address?.trim() || null,
         lat: parsed.data.lat ?? null,
         lng: parsed.data.lng ?? null,
+        ...(parsed.data.gpsRadius != null && { gpsRadius: parsed.data.gpsRadius }),
+        ...(parsed.data.gpsEnforced != null && { gpsEnforced: parsed.data.gpsEnforced }),
         plan: 'FREE',
       },
     })
