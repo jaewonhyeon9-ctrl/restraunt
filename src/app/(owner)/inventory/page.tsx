@@ -238,10 +238,16 @@ export default function OwnerInventoryPage() {
         <h1 className="text-xl font-bold text-slate-100">재고 현황</h1>
         <div className="flex gap-2">
           <Link
+            href="/menu"
+            className="btn-ghost !py-1.5 !px-3 !text-xs"
+          >
+            🍽️ 메뉴
+          </Link>
+          <Link
             href="/owner/inventory/orders"
             className="btn-ghost !py-1.5 !px-3 !text-xs"
           >
-            발주내역
+            발주
           </Link>
           <button
             onClick={() => setShowExcelModal(true)}
