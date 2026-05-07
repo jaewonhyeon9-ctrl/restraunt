@@ -54,6 +54,7 @@ export async function GET(
     price: menu.price,
     category: menu.category,
     isActive: menu.isActive,
+    costRatioThreshold: menu.costRatioThreshold,
     recipes: menu.recipes.map((r) => ({
       id: r.id,
       inventoryItemId: r.inventoryItemId,
@@ -87,6 +88,7 @@ export async function PATCH(
     price?: number
     category?: string | null
     isActive?: boolean
+    costRatioThreshold?: number | null
   }
 
   const data: Record<string, unknown> = {}
@@ -94,6 +96,12 @@ export async function PATCH(
   if (body.price !== undefined) data.price = Number(body.price)
   if (body.category !== undefined) data.category = body.category?.trim() || null
   if (body.isActive !== undefined) data.isActive = Boolean(body.isActive)
+  if (body.costRatioThreshold !== undefined) {
+    data.costRatioThreshold =
+      body.costRatioThreshold === null
+        ? null
+        : Math.max(0, Math.min(100, Number(body.costRatioThreshold)))
+  }
 
   const updated = await prisma.menu.update({ where: { id }, data })
   return NextResponse.json(updated)

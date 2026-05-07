@@ -62,6 +62,7 @@ export async function GET() {
       price: m.price,
       category: m.category,
       isActive: m.isActive,
+      costRatioThreshold: m.costRatioThreshold,
       recipeCount: m.recipes.length,
       totalCost: cost.totalCost,
       costRatio: cost.costRatio,

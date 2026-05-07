@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { MenuSaleModal } from '@/components/owner/MenuSaleModal'
 
 interface MenuListItem {
   id: string
@@ -8,6 +9,7 @@ interface MenuListItem {
   price: number
   category: string | null
   isActive: boolean
+  costRatioThreshold: number | null
   recipeCount: number
   totalCost: number
   costRatio: number | null
@@ -55,6 +57,12 @@ export default function MenuPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showSaleModal, setShowSaleModal] = useState(false)
+  const [thresholdInput, setThresholdInput] = useState<string>('')
+  const [actualAnalysis, setActualAnalysis] = useState<{
+    overall: { revenue: number; cost: number; costRatio: number | null; itemCount: number }
+    byMenu: Array<{ menuId: string; menuName: string; revenue: number; cost: number; costRatio: number | null; qty: number }>
+  } | null>(null)
 
   function flash(type: 'success' | 'error', text: string) {
     setMsg({ type, text })
@@ -68,12 +76,17 @@ export default function MenuPage() {
   async function fetchAll() {
     setLoading(true)
     try {
-      const [menusRes, invRes] = await Promise.all([
+      const [menusRes, invRes, analysisRes] = await Promise.all([
         fetch('/api/menus'),
         fetch('/api/inventory'),
+        fetch('/api/sales/cost-analysis'),
       ])
       if (menusRes.ok) setMenus(await menusRes.json())
       if (invRes.ok) setInventory(await invRes.json())
+      if (analysisRes.ok) {
+        const data = await analysisRes.json()
+        setActualAnalysis({ overall: data.overall, byMenu: data.byMenu })
+      }
     } catch {
       flash('error', '메뉴를 불러오지 못했습니다.')
     } finally {
@@ -112,6 +125,7 @@ export default function MenuPage() {
 
   async function openEditMenu(menu: MenuListItem) {
     setEditTarget(menu)
+    setThresholdInput(menu.costRatioThreshold != null ? String(menu.costRatioThreshold) : '')
     try {
       const res = await fetch(`/api/menus/${menu.id}`)
       if (!res.ok) {
@@ -137,11 +151,40 @@ export default function MenuPage() {
     }
   }
 
+  async function saveThreshold() {
+    if (!editTarget) return
+    const trimmed = thresholdInput.trim()
+    const value = trimmed === '' ? null : Number(trimmed)
+    if (value !== null && (!Number.isFinite(value) || value < 0 || value > 100)) {
+      flash('error', '임계값은 0~100 사이여야 합니다.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/menus/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ costRatioThreshold: value }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error ?? '저장 실패')
+      }
+      flash('success', value == null ? '임계값 비활성화' : `임계값 ${value}% 저장됨`)
+      fetchAll()
+    } catch (e) {
+      flash('error', e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   function closeEdit() {
     setEditTarget(null)
     setRecipeRows([])
     setAddRecipeOpen(false)
     setRecipeSearch('')
+    setThresholdInput('')
   }
 
   function addRecipeRow(item: InventoryItem) {
@@ -262,13 +305,38 @@ export default function MenuPage() {
     <div className="px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">🍽️ 메뉴 / 원가</h1>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-bold"
-        >
-          + 메뉴
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowSaleModal(true)}
+            disabled={menus.length === 0}
+            className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold disabled:opacity-40"
+          >
+            💰 판매
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-bold"
+          >
+            + 메뉴
+          </button>
+        </div>
       </div>
+
+      {showSaleModal && (
+        <MenuSaleModal
+          menus={menus.map((m) => ({
+            id: m.id,
+            name: m.name,
+            price: m.price,
+            category: m.category,
+            totalCost: m.totalCost,
+            costRatio: m.costRatio,
+          }))}
+          open={showSaleModal}
+          onClose={() => setShowSaleModal(false)}
+          onRecorded={fetchAll}
+        />
+      )}
 
       {msg && (
         <div
@@ -301,8 +369,49 @@ export default function MenuPage() {
             >
               {summary.avgRatio != null ? `${summary.avgRatio.toFixed(0)}%` : '-'}
             </p>
-            <p className="text-[10px] text-gray-500 mt-0.5">평균 원가율</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">평균 원가율 (이론)</p>
           </div>
+        </div>
+      )}
+
+      {/* 스냅샷 기반 실제 원가율 (특허 청구 #9 핵심 효과) */}
+      {!loading && actualAnalysis && actualAnalysis.overall.itemCount > 0 && (
+        <div className="bg-gradient-to-br from-emerald-50 to-blue-50 rounded-2xl p-4 border-2 border-emerald-200">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-emerald-700">
+              📊 이번 달 실제 원가율 (판매 시점 스냅샷 기반)
+            </p>
+            <span className="text-[10px] text-emerald-600 font-semibold">
+              {actualAnalysis.overall.itemCount}건
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white rounded-xl p-2.5 text-center">
+              <p className="text-xs font-bold text-gray-800">
+                {formatWon(actualAnalysis.overall.revenue)}
+              </p>
+              <p className="text-[10px] text-gray-500">매출</p>
+            </div>
+            <div className="bg-white rounded-xl p-2.5 text-center">
+              <p className="text-xs font-bold text-gray-700">
+                {formatWon(actualAnalysis.overall.cost)}
+              </p>
+              <p className="text-[10px] text-gray-500">원가</p>
+            </div>
+            <div className="bg-white rounded-xl p-2.5 text-center">
+              <p
+                className={`text-base font-bold ${ratioColor(actualAnalysis.overall.costRatio)}`}
+              >
+                {actualAnalysis.overall.costRatio != null
+                  ? `${actualAnalysis.overall.costRatio.toFixed(1)}%`
+                  : '-'}
+              </p>
+              <p className="text-[10px] text-gray-500">실제 원가율</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-600 mt-2 leading-snug">
+            💡 식자재 단가가 변경돼도 과거 매출의 원가는 판매 시점 단가로 보존됩니다. 이론 원가율(현재 단가)과 실제 원가율(스냅샷)의 차이를 비교해보세요.
+          </p>
         </div>
       )}
 
@@ -341,6 +450,11 @@ export default function MenuPage() {
                         레시피 미등록
                       </span>
                     )}
+                    {m.costRatioThreshold != null && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        ⚠ 임계 {m.costRatioThreshold}%
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">
                     재료 {m.recipeCount}개
@@ -359,19 +473,55 @@ export default function MenuPage() {
               {m.recipeCount > 0 && (
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50">
                   <div>
-                    <p className="text-[10px] text-gray-500">원가</p>
+                    <p className="text-[10px] text-gray-500">현재 원가 (이론)</p>
                     <p className="text-sm font-semibold text-gray-700">
                       {formatWon(m.totalCost)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] text-gray-500">원가율</p>
+                    <p className="text-[10px] text-gray-500">현재 원가율 (이론)</p>
                     <p className={`text-sm font-bold ${ratioColor(m.costRatio)}`}>
                       {m.costRatio != null ? `${m.costRatio.toFixed(1)}%` : '-'}
                     </p>
                   </div>
                 </div>
               )}
+
+              {/* 실제 판매 데이터 기반 원가율 (스냅샷) */}
+              {(() => {
+                const actual = actualAnalysis?.byMenu.find((b) => b.menuId === m.id)
+                if (!actual || actual.qty === 0) return null
+                const diff =
+                  actual.costRatio != null && m.costRatio != null
+                    ? actual.costRatio - m.costRatio
+                    : null
+                return (
+                  <div className="mt-2 pt-2 border-t border-emerald-100 bg-emerald-50/50 -mx-3 -mb-3 px-3 pb-3 rounded-b-2xl">
+                    <p className="text-[10px] font-semibold text-emerald-700 mb-1">
+                      📊 이번 달 실제 (판매 {actual.qty}건)
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[10px] text-gray-500">실 매출</p>
+                        <p className="text-xs font-semibold text-gray-700">
+                          {formatWon(actual.revenue)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-500">실 원가율 (스냅샷)</p>
+                        <p className={`text-xs font-bold ${ratioColor(actual.costRatio)}`}>
+                          {actual.costRatio != null ? `${actual.costRatio.toFixed(1)}%` : '-'}
+                          {diff != null && Math.abs(diff) >= 0.1 && (
+                            <span className="ml-1 text-[10px] text-gray-500">
+                              ({diff > 0 ? '+' : ''}{diff.toFixed(1)}%)
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           ))}
         </div>
@@ -569,6 +719,37 @@ export default function MenuPage() {
               )}
 
               {/* 실시간 원가 */}
+              {/* 임계 원가율 설정 */}
+              <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-blue-700">⚠ 임계 원가율</p>
+                  <p className="text-[10px] text-blue-600">초과 시 사장에게 푸시</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={thresholdInput}
+                    onChange={(e) => setThresholdInput(e.target.value)}
+                    placeholder="예: 35 (비활성)"
+                    className="flex-1 px-3 py-1.5 rounded-lg border border-blue-200 text-sm bg-white"
+                  />
+                  <span className="text-xs text-gray-600">%</span>
+                  <button
+                    onClick={saveThreshold}
+                    disabled={submitting}
+                    className="px-3 py-1.5 rounded-lg bg-blue-500 text-white text-xs font-bold disabled:opacity-50"
+                  >
+                    저장
+                  </button>
+                </div>
+                <p className="text-[10px] text-blue-600">
+                  비워두면 임계값 비활성. 매뉴 판매 시 원가율이 임계값을 넘으면 사장님께 푸시 알림이 발송됩니다.
+                </p>
+              </div>
+
               {editingCost && recipeRows.length > 0 && (
                 <div className="bg-orange-50 rounded-xl p-3 border border-orange-200 space-y-1">
                   <div className="flex justify-between text-xs">

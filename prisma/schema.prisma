@@ -15,6 +15,7 @@ model Restaurant {
   lng            Float?
   gpsRadius      Int      @default(200)  // 기본값 50→200m 완화 (실내 GPS 오차 대응)
   gpsEnforced    Boolean  @default(true) // false면 GPS 검증 우회 (오프라인/실내 등)
+  globalCostRatioThreshold Float?        // 식당 전체 임계 원가율(%) — 초과 시 사장 푸시
   plan           Plan     @default(FREE)
   createdAt  DateTime @default(now())
 
@@ -40,14 +41,15 @@ model Restaurant {
 
 // 메뉴 (판매 단위)
 model Menu {
-  id           String   @id @default(cuid())
-  restaurantId String
-  name         String
-  price        Float    // 판매가
-  category     String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  restaurantId       String
+  name               String
+  price              Float    // 판매가
+  category           String?
+  costRatioThreshold Float?   // 메뉴별 임계 원가율(%) — 초과 시 사장 푸시
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   recipes    MenuRecipe[]
