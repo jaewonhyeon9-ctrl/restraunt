@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 
 const tabs = [
   { href: '/home', label: '홈', icon: '🏠' },
@@ -40,15 +40,29 @@ export default function EmployeeLayout({
       )}
 
       <header className="sticky top-0 z-40 border-b border-white/5 bg-[rgba(7,9,14,0.72)] backdrop-blur-xl">
-        <div className="mx-auto max-w-md px-4 h-14 flex items-center justify-between">
-          <span className="text-base font-bold text-slate-100">직원 메뉴</span>
-          <span className="text-xs text-slate-500">
-            {new Date().toLocaleDateString('ko-KR', {
-              month: 'long',
-              day: 'numeric',
-              weekday: 'short',
-            })}
-          </span>
+        <div className="mx-auto max-w-md px-4 h-14 flex items-center justify-between gap-2">
+          <div className="flex flex-col leading-tight min-w-0">
+            <span className="text-base font-bold text-slate-100 truncate">
+              {(session?.user as { name?: string } | undefined)?.name ?? '직원'}님
+            </span>
+            <span className="text-[10px] text-slate-500">
+              {new Date().toLocaleDateString('ko-KR', {
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short',
+              })}
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              if (confirm('로그아웃 하시겠습니까?')) {
+                signOut({ callbackUrl: '/login' })
+              }
+            }}
+            className="flex-shrink-0 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 font-medium border border-white/10"
+          >
+            로그아웃
+          </button>
         </div>
       </header>
 

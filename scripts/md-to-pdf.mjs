@@ -88,11 +88,16 @@ function mdToHtml(md) {
     // 코드 블록
     if (line.startsWith('```')) {
       if (inCode) {
-        out.push(
-          `<pre><code class="lang-${escapeHtml(codeLang)}">${codeBuf
-            .map(escapeHtml)
-            .join('\n')}</code></pre>`
-        )
+        if (codeLang === 'mermaid') {
+          // Mermaid 다이어그램은 raw 텍스트 그대로(escape 없이) 두고 클라이언트에서 SVG 렌더링
+          out.push(`<div class="mermaid">${codeBuf.join('\n')}</div>`)
+        } else {
+          out.push(
+            `<pre><code class="lang-${escapeHtml(codeLang)}">${codeBuf
+              .map(escapeHtml)
+              .join('\n')}</code></pre>`
+          )
+        }
         codeBuf = []
         inCode = false
         codeLang = ''
@@ -300,7 +305,39 @@ const html = `<!doctype html>
   a:hover { text-decoration: underline; }
   /* 첫 페이지 제목 강조 */
   h1:first-of-type { margin-top: 0; }
+  /* Mermaid 다이어그램 컨테이너 */
+  .mermaid {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 14px;
+    margin: 1.2em 0;
+    text-align: center;
+    page-break-inside: avoid;
+    overflow: auto;
+  }
+  .mermaid svg { max-width: 100%; height: auto; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  // Mermaid 다이어그램이 모두 렌더링될 때까지 대기 후 print 준비 신호
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (typeof mermaid !== 'undefined') {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose',
+        flowchart: { useMaxWidth: true, htmlLabels: true },
+        sequence: { useMaxWidth: true },
+      });
+      try {
+        await mermaid.run({ querySelector: '.mermaid' });
+      } catch (e) {
+        console.error('Mermaid render error:', e);
+      }
+    }
+  });
+</script>
 </head>
 <body>
 ${bodyHtml}
@@ -336,6 +373,9 @@ const result = spawnSync(
     '--disable-gpu',
     '--no-sandbox',
     '--no-pdf-header-footer',
+    // Mermaid 등 외부 스크립트 로드 + 렌더링 시간 확보 (8초)
+    '--virtual-time-budget=8000',
+    '--run-all-compositor-stages-before-draw',
     `--print-to-pdf=${outputPdf}`,
     fileUrl,
   ],
