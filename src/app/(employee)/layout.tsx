@@ -6,9 +6,10 @@ import { useSession, signOut } from 'next-auth/react'
 
 const tabs = [
   { href: '/home', label: '홈', icon: '🏠' },
-  { href: '/checklist', label: '체크리스트', icon: '✅' },
-  { href: '/inventory/check', label: '재고파악', icon: '📦' },
-  { href: '/inventory/order', label: '발주신청', icon: '📋' },
+  { href: '/checklist', label: '체크', icon: '✅' },
+  { href: '/menu', label: '메뉴', icon: '📖' },
+  { href: '/inventory/check', label: '재고', icon: '📦' },
+  { href: '/inventory/order', label: '발주', icon: '📋' },
   { href: '/profile', label: '내정보', icon: '👤' },
 ]
 

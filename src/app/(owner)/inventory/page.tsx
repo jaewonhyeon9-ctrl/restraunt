@@ -75,6 +75,15 @@ export default function OwnerInventoryPage() {
   const [sortMode, setSortMode] = useState<SortMode>('name')
   const [groupMode, setGroupMode] = useState<GroupMode>('supplier')
   const [editTarget, setEditTarget] = useState<InventoryItem | null>(null)
+  const [logs, setLogs] = useState<Array<{
+    id: string
+    type: 'IN' | 'OUT' | 'ADJUST' | 'ORDER_IN'
+    quantity: number
+    note: string | null
+    userName: string | null
+    createdAt: string
+  }> | null>(null)
+  const [logsLoading, setLogsLoading] = useState(false)
 
   const lowStockItems = items.filter(
     (item) => item.safetyStock !== null && item.currentStock <= item.safetyStock
@@ -122,7 +131,15 @@ export default function OwnerInventoryPage() {
       supplierId: item.supplier?.id ?? '',
     })
     setError('')
+    setLogs(null)
     setShowModal(true)
+    // 변동 이력 비동기 조회
+    setLogsLoading(true)
+    fetch(`/api/inventory/${item.id}/logs?limit=50`)
+      .then((r) => (r.ok ? r.json() : { logs: [] }))
+      .then((d) => setLogs(d.logs ?? []))
+      .catch(() => setLogs([]))
+      .finally(() => setLogsLoading(false))
   }
 
   async function handleSubmitItem(e: React.FormEvent) {
@@ -641,6 +658,57 @@ export default function OwnerInventoryPage() {
                 </button>
               )}
             </form>
+
+            {/* 변동 이력 (편집 모드일 때만) */}
+            {editTarget && (
+              <div className="mt-5 pt-4 border-t border-gray-100">
+                <p className="text-sm font-bold text-gray-700 mb-2">📜 변동 이력</p>
+                {logsLoading ? (
+                  <div className="text-center py-4 text-xs text-gray-400">불러오는 중...</div>
+                ) : logs && logs.length > 0 ? (
+                  <ul className="space-y-1.5 max-h-72 overflow-y-auto">
+                    {logs.map((l) => {
+                      const isIn = l.type === 'IN' || l.type === 'ORDER_IN'
+                      const sign = isIn ? '+' : '−'
+                      const tone = isIn
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                        : l.type === 'OUT'
+                        ? 'text-rose-700 bg-rose-50 border-rose-200'
+                        : 'text-blue-700 bg-blue-50 border-blue-200'
+                      return (
+                        <li
+                          key={l.id}
+                          className={`rounded-lg px-2.5 py-1.5 border text-xs ${tone}`}
+                        >
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="font-bold">
+                              {sign}
+                              {Math.abs(l.quantity).toLocaleString()} {editTarget.unit}
+                            </span>
+                            <span className="text-[10px] opacity-70">
+                              {new Date(l.createdAt).toLocaleString('ko-KR', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                          {l.note && <p className="text-[10px] opacity-80">{l.note}</p>}
+                          {l.userName && (
+                            <p className="text-[10px] opacity-60 mt-0.5">{l.userName}</p>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-gray-400 text-center py-4">
+                    아직 변동 이력이 없습니다.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

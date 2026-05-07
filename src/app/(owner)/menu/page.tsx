@@ -24,6 +24,7 @@ interface InventoryItem {
   unit: string
   unitPrice: number | null
   packageWeightG: number | null
+  category: string | null
 }
 
 interface RecipeRow {
@@ -279,10 +280,7 @@ export default function MenuPage() {
   }
 
   function addRecipeRow(item: InventoryItem) {
-    if (recipeRows.some((r) => r.inventoryItemId === item.id)) {
-      flash('error', '이미 추가된 재료입니다.')
-      return
-    }
+    if (recipeRows.some((r) => r.inventoryItemId === item.id)) return
     setRecipeRows((prev) => [
       ...prev,
       {
@@ -293,8 +291,7 @@ export default function MenuPage() {
         itemUnitPrice: item.unitPrice,
       },
     ])
-    setAddRecipeOpen(false)
-    setRecipeSearch('')
+    // 닫지 않음 — 사용자가 연속해서 여러 재료 추가 가능
   }
 
   function updateQty(id: string, qty: number) {
@@ -369,12 +366,34 @@ export default function MenuPage() {
     return { total, withRecipe, avgRatio: avg }
   }, [menus])
 
-  // 검색 필터
+  // 재고 카테고리 목록
+  const inventoryCategories = useMemo(() => {
+    const set = new Set<string>()
+    let hasNone = false
+    for (const i of inventory) {
+      if (i.category) set.add(i.category)
+      else hasNone = true
+    }
+    return { list: Array.from(set).sort(), hasNone }
+  }, [inventory])
+
+  const [recipeCategoryFilter, setRecipeCategoryFilter] = useState<string>('__all__')
+
+  // 검색 + 카테고리 + 이미 추가된 재료 제외
   const filteredInventory = useMemo(() => {
     const q = recipeSearch.trim().toLowerCase()
-    if (!q) return inventory
-    return inventory.filter((i) => i.name.toLowerCase().includes(q))
-  }, [inventory, recipeSearch])
+    const addedIds = new Set(recipeRows.map((r) => r.inventoryItemId))
+    return inventory.filter((i) => {
+      if (addedIds.has(i.id)) return false
+      if (recipeCategoryFilter === '__none__') {
+        if (i.category) return false
+      } else if (recipeCategoryFilter !== '__all__') {
+        if (i.category !== recipeCategoryFilter) return false
+      }
+      if (q && !i.name.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [inventory, recipeSearch, recipeCategoryFilter, recipeRows])
 
   // 편집 중 실시간 원가율
   const editingCost = useMemo(() => {
@@ -819,43 +838,98 @@ export default function MenuPage() {
 
               {/* 재료 추가 */}
               {addRecipeOpen ? (
-                <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 space-y-2">
                   <input
                     type="text"
                     value={recipeSearch}
                     onChange={(e) => setRecipeSearch(e.target.value)}
                     placeholder="재료 검색..."
                     autoFocus
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white mb-2"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
                   />
-                  <div className="max-h-60 overflow-y-auto space-y-1">
+
+                  {/* 카테고리 필터 칩 */}
+                  {(inventoryCategories.list.length > 0 || inventoryCategories.hasNone) && (
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      <button
+                        onClick={() => setRecipeCategoryFilter('__all__')}
+                        className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium ${
+                          recipeCategoryFilter === '__all__'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-white text-gray-600 border border-gray-200'
+                        }`}
+                      >
+                        전체
+                      </button>
+                      {inventoryCategories.list.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => setRecipeCategoryFilter(c)}
+                          className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium ${
+                            recipeCategoryFilter === c
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-white text-gray-600 border border-gray-200'
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                      {inventoryCategories.hasNone && (
+                        <button
+                          onClick={() => setRecipeCategoryFilter('__none__')}
+                          className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium ${
+                            recipeCategoryFilter === '__none__'
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-white text-gray-600 border border-gray-200'
+                          }`}
+                        >
+                          미분류
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="max-h-72 overflow-y-auto space-y-1">
                     {filteredInventory.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-3">
-                        검색 결과 없음
+                      <p className="text-xs text-gray-400 text-center py-6">
+                        {recipeRows.length > 0 && inventory.length > recipeRows.length
+                          ? '추가 가능한 재료 없음 (필터 변경 또는 검색어 지우기)'
+                          : '재고 없음'}
                       </p>
                     ) : (
                       filteredInventory.map((i) => (
                         <button
                           key={i.id}
                           onClick={() => addRecipeRow(i)}
-                          className="w-full text-left px-2 py-1.5 rounded-lg bg-white hover:bg-blue-100 text-xs flex items-center justify-between"
+                          className="w-full text-left px-3 py-2 rounded-lg bg-white hover:bg-blue-100 text-xs flex items-center justify-between active:scale-95 transition-transform"
                         >
-                          <span className="font-medium text-gray-800 truncate">{i.name}</span>
-                          <span className="text-gray-400">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-800 truncate">{i.name}</p>
+                            {i.category && (
+                              <p className="text-[10px] text-gray-400">{i.category}</p>
+                            )}
+                          </div>
+                          <span className="text-gray-400 text-[11px] ml-2">
                             {i.unitPrice != null ? formatWon(i.unitPrice) : '단가 없음'}/{i.unit}
                           </span>
                         </button>
                       ))
                     )}
                   </div>
+
+                  <p className="text-[10px] text-blue-600 text-center">
+                    💡 여러 재료를 연속해서 클릭하면 한 번에 추가됩니다 (선택 {recipeRows.length}개)
+                  </p>
+
                   <button
                     onClick={() => {
                       setAddRecipeOpen(false)
                       setRecipeSearch('')
+                      setRecipeCategoryFilter('__all__')
                     }}
-                    className="w-full mt-2 py-1.5 rounded-lg text-xs text-gray-600 bg-white"
+                    className="w-full py-2 rounded-lg text-xs text-blue-700 bg-white border border-blue-300 font-medium"
                   >
-                    닫기
+                    완료
                   </button>
                 </div>
               ) : (

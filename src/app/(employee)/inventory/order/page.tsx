@@ -203,7 +203,15 @@ export default function EmployeeOrderPage() {
 
   return (
     <div className="px-4 py-4">
-      <h1 className="text-xl font-bold text-gray-900 mb-1">발주 신청</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-xl font-bold text-gray-900">발주 신청</h1>
+        <a
+          href="/inventory/order/history"
+          className="text-xs text-indigo-300 hover:text-indigo-200 px-2 py-1 rounded-lg bg-white/5 ring-1 ring-white/10"
+        >
+          📅 내역
+        </a>
+      </div>
       <p className="text-sm text-gray-400 mb-4">
         발주할 품목을 선택하고 수량을 입력하세요.
       </p>
