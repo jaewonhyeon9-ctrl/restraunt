@@ -55,6 +55,8 @@ export async function GET(
     category: menu.category,
     isActive: menu.isActive,
     costRatioThreshold: menu.costRatioThreshold,
+    cookingSteps: menu.cookingSteps,
+    imageUrl: menu.imageUrl,
     recipes: menu.recipes.map((r) => ({
       id: r.id,
       inventoryItemId: r.inventoryItemId,
@@ -89,6 +91,8 @@ export async function PATCH(
     category?: string | null
     isActive?: boolean
     costRatioThreshold?: number | null
+    cookingSteps?: string | null
+    imageUrl?: string | null
   }
 
   const data: Record<string, unknown> = {}
@@ -101,6 +105,12 @@ export async function PATCH(
       body.costRatioThreshold === null
         ? null
         : Math.max(0, Math.min(100, Number(body.costRatioThreshold)))
+  }
+  if (body.cookingSteps !== undefined) {
+    data.cookingSteps = body.cookingSteps?.trim() || null
+  }
+  if (body.imageUrl !== undefined) {
+    data.imageUrl = body.imageUrl?.trim() || null
   }
 
   const updated = await prisma.menu.update({ where: { id }, data })

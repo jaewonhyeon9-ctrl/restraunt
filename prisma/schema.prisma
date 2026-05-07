@@ -47,6 +47,8 @@ model Menu {
   price              Float    // 판매가
   category           String?
   costRatioThreshold Float?   // 메뉴별 임계 원가율(%) — 초과 시 사장 푸시
+  cookingSteps       String?  // 조리 매뉴얼 (절차 텍스트, 줄바꿈으로 단계 구분)
+  imageUrl           String?  // 메뉴 완성 사진 (Cloudinary URL)
   isActive           Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

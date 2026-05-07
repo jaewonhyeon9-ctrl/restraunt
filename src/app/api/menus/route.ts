@@ -63,6 +63,8 @@ export async function GET() {
       category: m.category,
       isActive: m.isActive,
       costRatioThreshold: m.costRatioThreshold,
+      cookingSteps: m.cookingSteps,
+      imageUrl: m.imageUrl,
       recipeCount: m.recipes.length,
       totalCost: cost.totalCost,
       costRatio: cost.costRatio,

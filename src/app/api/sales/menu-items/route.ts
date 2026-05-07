@@ -5,19 +5,60 @@ import { recordMenuSale, type MenuSaleItemInput } from '@/lib/sale-with-items'
 import { sendPushToUser } from '@/lib/push'
 
 /**
- * POST /api/sales/menu-items
+ * GET /api/sales/menu-items?date=YYYY-MM-DD
  *
- * 청구 #9 핵심 API. 메뉴 + 수량으로 매출을 등록하면:
- *  - 단일 트랜잭션 내에서 다중 재고 자동 차감
- *  - 판매 시점 식자재 단가를 SaleItem.costAtSale 에 스냅샷 저장
- *  - 메뉴별·식당 전체 임계 원가율 초과 시 사장에게 푸시
- *
- * Body:
- *   {
- *     saleDate: "YYYY-MM-DD",
- *     items: [{ menuId, qty, customUnitPrice? }, ...],
- *     cashAmount?, cardAmount?, deliveryAmount?, note?
- *   }
+ * 특정 날짜에 기록된 메뉴 매출 항목 목록 (최신순).
+ * 취소 버튼 노출용.
+ */
+export async function GET(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+  }
+  const restaurantId = (session.user as { restaurantId?: string }).restaurantId
+  if (!restaurantId) {
+    return NextResponse.json({ error: '사업장 정보가 없습니다.' }, { status: 400 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const dateParam = searchParams.get('date')
+  const day = dateParam ? new Date(dateParam) : new Date()
+  day.setHours(0, 0, 0, 0)
+  const next = new Date(day)
+  next.setDate(next.getDate() + 1)
+
+  const items = await prisma.saleItem.findMany({
+    where: {
+      sale: {
+        restaurantId,
+        saleDate: { gte: day, lt: next },
+      },
+    },
+    include: {
+      sale: { select: { saleDate: true } },
+      menu: { select: { id: true, name: true, category: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return NextResponse.json({
+    items: items.map((it) => ({
+      id: it.id,
+      menuId: it.menuId,
+      menuName: it.menu?.name ?? it.rawName,
+      category: it.menu?.category ?? null,
+      qty: it.qty,
+      unitPrice: it.unitPrice,
+      subtotal: it.subtotal,
+      costAtSale: it.costAtSale,
+      createdAt: it.createdAt.toISOString(),
+    })),
+  })
+}
+
+/**
+ * POST /api/sales/menu-items — 청구 #9 핵심 API.
+ * (자세한 동작은 lib/sale-with-items.ts 주석 참고)
  */
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -74,7 +115,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // 임계 초과 시 OWNER/MANAGER에게 푸시 (best-effort)
   if (result.alerts.length > 0) {
     const owners = await prisma.userRestaurant.findMany({
       where: { restaurantId, role: { in: ['OWNER', 'MANAGER'] } },

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface MenuItem {
   id: string
@@ -38,6 +38,9 @@ type SaleResult = {
   }[]
 }
 
+const ALL_CAT = '__all__'
+const NO_CAT = '__none__'
+
 function formatWon(n: number | null | undefined): string {
   if (n == null) return '-'
   return `${Math.round(n).toLocaleString()}원`
@@ -66,6 +69,19 @@ export function MenuSaleModal({
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<SaleResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeCategory, setActiveCategory] = useState<string>(ALL_CAT)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    if (!open) {
+      // 닫힐 때 상태 초기화
+      setDrafts([])
+      setResult(null)
+      setError(null)
+      setSearch('')
+      setActiveCategory(ALL_CAT)
+    }
+  }, [open])
 
   function getQty(menuId: string): number {
     return drafts.find((d) => d.menuId === menuId)?.qty ?? 0
@@ -78,6 +94,18 @@ export function MenuSaleModal({
       return [...without, { menuId, qty }]
     })
   }
+
+  // 카테고리 목록 추출
+  const categories = useMemo(() => {
+    const set = new Set<string>()
+    let hasNone = false
+    for (const m of menus) {
+      if (m.category) set.add(m.category)
+      else hasNone = true
+    }
+    const list = Array.from(set).sort()
+    return { list, hasNone }
+  }, [menus])
 
   // 사전 계산 (서버 호출 없이도 미리보기)
   const preview = useMemo(() => {
@@ -92,6 +120,20 @@ export function MenuSaleModal({
     const ratio = totalAmount > 0 ? (totalCost / totalAmount) * 100 : null
     return { totalAmount, totalCost, ratio, count: drafts.length }
   }, [drafts, menus])
+
+  // 필터링된 메뉴
+  const filteredMenus = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return menus.filter((m) => {
+      if (activeCategory === NO_CAT) {
+        if (m.category) return false
+      } else if (activeCategory !== ALL_CAT) {
+        if (m.category !== activeCategory) return false
+      }
+      if (q && !m.name.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [menus, activeCategory, search])
 
   async function submit() {
     if (drafts.length === 0) {
@@ -123,12 +165,6 @@ export function MenuSaleModal({
     }
   }
 
-  function reset() {
-    setDrafts([])
-    setResult(null)
-    setError(null)
-  }
-
   if (!open) return null
 
   // 결과 화면
@@ -139,10 +175,7 @@ export function MenuSaleModal({
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
             <h3 className="text-base font-bold text-emerald-600">✓ 매출 등록 완료</h3>
             <button
-              onClick={() => {
-                reset()
-                onClose()
-              }}
+              onClick={onClose}
               className="text-gray-400 text-2xl leading-none w-8 h-8"
             >
               ×
@@ -150,7 +183,6 @@ export function MenuSaleModal({
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-            {/* 요약 카드 */}
             <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200">
               <div className="flex justify-between mb-2">
                 <span className="text-xs text-gray-600">매출 합계</span>
@@ -172,7 +204,6 @@ export function MenuSaleModal({
               </div>
             </div>
 
-            {/* 임계 초과 알림 */}
             {result.alerts.length > 0 && (
               <div className="bg-rose-50 border border-rose-300 rounded-xl p-3">
                 <p className="text-xs font-bold text-rose-700 mb-1.5">⚠ 임계 원가율 초과</p>
@@ -191,7 +222,6 @@ export function MenuSaleModal({
               </div>
             )}
 
-            {/* 항목별 상세 */}
             <div>
               <p className="text-xs font-bold text-gray-700 mb-2">항목별 결과</p>
               <ul className="space-y-2">
@@ -222,7 +252,7 @@ export function MenuSaleModal({
             <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
               <p className="text-[11px] font-bold text-blue-700 mb-1">📦 자동 차감</p>
               <p className="text-[11px] text-blue-700">
-                각 메뉴의 레시피에 따라 재고가 단일 트랜잭션으로 차감되었습니다. 재고 페이지에서 확인하세요.
+                각 메뉴의 레시피에 따라 재고가 단일 트랜잭션으로 차감되었습니다.
               </p>
             </div>
           </div>
@@ -230,17 +260,17 @@ export function MenuSaleModal({
           <div className="flex-shrink-0 px-5 py-3 border-t border-gray-100 bg-white pb-[calc(env(safe-area-inset-bottom)+12px)] space-y-2">
             <button
               onClick={() => {
-                reset()
+                setResult(null)
+                setDrafts([])
+                setError(null)
+                setSearch('')
               }}
               className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-medium"
             >
-              + 또 등록
+              + 또 등록하기
             </button>
             <button
-              onClick={() => {
-                reset()
-                onClose()
-              }}
+              onClick={onClose}
               className="w-full py-2.5 rounded-xl bg-orange-500 text-white text-sm font-bold"
             >
               닫기
@@ -255,34 +285,79 @@ export function MenuSaleModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
       <div className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90dvh]">
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-          <h3 className="text-base font-bold text-gray-900">💰 메뉴 판매 기록</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 text-2xl leading-none w-8 h-8"
-          >
-            ×
-          </button>
-        </div>
+        {/* 헤더 (sticky) */}
+        <div className="flex-shrink-0 border-b border-gray-100 bg-white">
+          <div className="flex items-center justify-between px-5 pt-5 pb-2">
+            <h3 className="text-base font-bold text-gray-900">💰 메뉴 판매 기록</h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 text-2xl leading-none w-8 h-8"
+            >
+              ×
+            </button>
+          </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">판매 날짜</label>
+          {/* 날짜 + 검색 */}
+          <div className="px-5 pb-2 flex gap-2">
             <input
               type="date"
               value={saleDate}
               onChange={(e) => setSaleDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm"
+              className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="메뉴 검색..."
+              className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 text-sm"
             />
           </div>
 
-          {error && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-xs text-rose-700">
-              {error}
-            </div>
-          )}
+          {/* 카테고리 탭 */}
+          <div className="px-5 pb-2 flex gap-1.5 overflow-x-auto pb-1">
+            <button
+              onClick={() => setActiveCategory(ALL_CAT)}
+              className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium ${
+                activeCategory === ALL_CAT
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              전체 ({menus.length})
+            </button>
+            {categories.list.map((c) => {
+              const count = menus.filter((m) => m.category === c).length
+              return (
+                <button
+                  key={c}
+                  onClick={() => setActiveCategory(c)}
+                  className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium ${
+                    activeCategory === c
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {c} ({count})
+                </button>
+              )
+            })}
+            {categories.hasNone && (
+              <button
+                onClick={() => setActiveCategory(NO_CAT)}
+                className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium ${
+                  activeCategory === NO_CAT
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                미분류
+              </button>
+            )}
+          </div>
 
-          <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 sticky top-0">
+          {/* 실시간 미리보기 */}
+          <div className="mx-5 mb-3 bg-gradient-to-br from-orange-50 to-yellow-50 rounded-xl p-3 border border-orange-200">
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
                 <p className="text-[10px] text-gray-500">선택</p>
@@ -302,91 +377,104 @@ export function MenuSaleModal({
               </div>
             </div>
           </div>
-
-          <ul className="space-y-2">
-            {menus.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 text-sm">
-                등록된 메뉴가 없습니다.
-              </div>
-            ) : (
-              menus.map((m) => {
-                const qty = getQty(m.id)
-                const recipeReady = m.totalCost > 0
-                return (
-                  <li
-                    key={m.id}
-                    className={`rounded-xl p-3 border ${
-                      qty > 0
-                        ? 'bg-orange-50 border-orange-300'
-                        : 'bg-white border-gray-100'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-sm font-bold text-gray-900">{m.name}</p>
-                          {m.category && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                              {m.category}
-                            </span>
-                          )}
-                          {!recipeReady && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                              레시피 미등록
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          {formatWon(m.price)} · 원가 {formatWon(m.totalCost)} ·{' '}
-                          <span className={ratioColor(m.costRatio)}>
-                            {m.costRatio != null ? `${m.costRatio.toFixed(1)}%` : '-'}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setQty(m.id, Math.max(0, qty - 1))}
-                        disabled={qty === 0}
-                        className="w-8 h-8 rounded-full bg-gray-100 disabled:opacity-30 text-lg font-bold"
-                      >
-                        −
-                      </button>
-                      <input
-                        type="number"
-                        min={0}
-                        value={qty}
-                        onChange={(e) => setQty(m.id, Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                        className="flex-1 text-center px-2 py-1.5 rounded-lg border border-gray-200 text-sm bg-white"
-                      />
-                      <button
-                        onClick={() => setQty(m.id, qty + 1)}
-                        className="w-8 h-8 rounded-full bg-orange-500 text-white text-lg font-bold"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </li>
-                )
-              })
-            )}
-          </ul>
         </div>
 
+        {/* 메뉴 목록 */}
+        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-xs text-rose-700">
+              {error}
+            </div>
+          )}
+
+          {filteredMenus.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              {search ? '검색 결과 없음' : '카테고리에 메뉴가 없습니다.'}
+            </div>
+          ) : (
+            filteredMenus.map((m) => {
+              const qty = getQty(m.id)
+              const recipeReady = m.totalCost > 0
+              return (
+                <div
+                  key={m.id}
+                  className={`rounded-2xl p-3 border-2 ${
+                    qty > 0
+                      ? 'bg-orange-50 border-orange-400'
+                      : 'bg-white border-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-sm font-bold text-gray-900 truncate">{m.name}</p>
+                        {!recipeReady && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                            레시피 미등록
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500">
+                        {formatWon(m.price)}{' '}
+                        {recipeReady && (
+                          <span className={ratioColor(m.costRatio)}>
+                            · {m.costRatio != null ? `${m.costRatio.toFixed(0)}%` : '-'}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    {qty > 0 && (
+                      <div className="text-right ml-2">
+                        <p className="text-[10px] text-gray-500">소계</p>
+                        <p className="text-sm font-bold text-orange-600">
+                          {formatWon(m.price * qty)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 큰 +/- 버튼 (모바일 친화) */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setQty(m.id, Math.max(0, qty - 1))}
+                      disabled={qty === 0}
+                      className="w-12 h-12 rounded-xl bg-gray-100 disabled:opacity-30 text-2xl font-bold active:scale-95"
+                    >
+                      −
+                    </button>
+                    <div className="flex-1 text-center">
+                      <p className={`text-3xl font-black tabular-nums ${qty > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
+                        {qty}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setQty(m.id, qty + 1)}
+                      className="w-12 h-12 rounded-xl bg-orange-500 text-white text-2xl font-bold active:scale-95"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* Sticky footer */}
         <div className="flex-shrink-0 px-5 py-3 border-t border-gray-100 bg-white pb-[calc(env(safe-area-inset-bottom)+12px)]">
           <button
             onClick={submit}
             disabled={submitting || drafts.length === 0}
-            className="w-full py-3 rounded-xl bg-orange-500 text-white font-bold disabled:opacity-40"
+            className="w-full py-3.5 rounded-xl bg-orange-500 text-white font-bold disabled:opacity-40 active:scale-95"
           >
             {submitting
               ? '등록 중...'
               : drafts.length === 0
               ? '메뉴를 선택하세요'
-              : `매출 ${formatWon(preview.totalAmount)} 등록 + 재고 차감`}
+              : `매출 ${formatWon(preview.totalAmount)} 등록`}
           </button>
-          <p className="text-[10px] text-gray-400 text-center mt-1.5">
-            등록 시 레시피 기반 다중 재고가 자동 차감되며, 판매 시점 단가가 스냅샷으로 저장됩니다.
+          <p className="text-[10px] text-gray-400 text-center mt-1">
+            등록 시 레시피 기반 다중 재고가 자동 차감되며, 판매 시점 단가가 보존됩니다.
           </p>
         </div>
       </div>

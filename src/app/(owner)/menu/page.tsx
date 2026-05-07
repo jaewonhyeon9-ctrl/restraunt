@@ -10,6 +10,8 @@ interface MenuListItem {
   category: string | null
   isActive: boolean
   costRatioThreshold: number | null
+  cookingSteps: string | null
+  imageUrl: string | null
   recipeCount: number
   totalCost: number
   costRatio: number | null
@@ -59,10 +61,20 @@ export default function MenuPage() {
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [showSaleModal, setShowSaleModal] = useState(false)
   const [thresholdInput, setThresholdInput] = useState<string>('')
+  const [cookingStepsInput, setCookingStepsInput] = useState<string>('')
+  const [imageUrlInput, setImageUrlInput] = useState<string>('')
   const [actualAnalysis, setActualAnalysis] = useState<{
     overall: { revenue: number; cost: number; costRatio: number | null; itemCount: number }
     byMenu: Array<{ menuId: string; menuName: string; revenue: number; cost: number; costRatio: number | null; qty: number }>
   } | null>(null)
+  const [todayItems, setTodayItems] = useState<Array<{
+    id: string
+    menuName: string
+    qty: number
+    subtotal: number
+    costAtSale: number | null
+    createdAt: string
+  }>>([])
 
   function flash(type: 'success' | 'error', text: string) {
     setMsg({ type, text })
@@ -76,10 +88,11 @@ export default function MenuPage() {
   async function fetchAll() {
     setLoading(true)
     try {
-      const [menusRes, invRes, analysisRes] = await Promise.all([
+      const [menusRes, invRes, analysisRes, todayRes] = await Promise.all([
         fetch('/api/menus'),
         fetch('/api/inventory'),
         fetch('/api/sales/cost-analysis'),
+        fetch('/api/sales/menu-items'),
       ])
       if (menusRes.ok) setMenus(await menusRes.json())
       if (invRes.ok) setInventory(await invRes.json())
@@ -87,10 +100,29 @@ export default function MenuPage() {
         const data = await analysisRes.json()
         setActualAnalysis({ overall: data.overall, byMenu: data.byMenu })
       }
+      if (todayRes.ok) {
+        const data = await todayRes.json()
+        setTodayItems(data.items ?? [])
+      }
     } catch {
       flash('error', '메뉴를 불러오지 못했습니다.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function undoSaleItem(id: string, name: string) {
+    if (!confirm(`"${name}" 매출 항목을 취소하시겠습니까?\n재고가 자동으로 복구됩니다.`)) return
+    try {
+      const res = await fetch(`/api/sales/menu-items/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error ?? '취소 실패')
+      }
+      flash('success', '매출 항목 취소됨, 재고 복구 완료')
+      fetchAll()
+    } catch (e) {
+      flash('error', e instanceof Error ? e.message : '취소 실패')
     }
   }
 
@@ -126,6 +158,8 @@ export default function MenuPage() {
   async function openEditMenu(menu: MenuListItem) {
     setEditTarget(menu)
     setThresholdInput(menu.costRatioThreshold != null ? String(menu.costRatioThreshold) : '')
+    setCookingStepsInput('')
+    setImageUrlInput('')
     try {
       const res = await fetch(`/api/menus/${menu.id}`)
       if (!res.ok) {
@@ -133,6 +167,8 @@ export default function MenuPage() {
         return
       }
       const data = await res.json()
+      setCookingStepsInput(data.cookingSteps ?? '')
+      setImageUrlInput(data.imageUrl ?? '')
       setRecipeRows(
         (data.recipes as Array<{
           inventoryItemId: string
@@ -148,6 +184,59 @@ export default function MenuPage() {
       )
     } catch {
       flash('error', '레시피 조회 실패')
+    }
+  }
+
+  async function saveCookingSteps() {
+    if (!editTarget) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/menus/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookingSteps: cookingStepsInput || null }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error ?? '저장 실패')
+      }
+      flash('success', '조리 매뉴얼이 저장되었습니다.')
+    } catch (e) {
+      flash('error', e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function uploadMenuImage(file: File) {
+    if (!editTarget) return
+    setSubmitting(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const upRes = await fetch('/api/upload/menu-photo', {
+        method: 'POST',
+        body: fd,
+      })
+      if (!upRes.ok) {
+        const j = await upRes.json().catch(() => ({}))
+        throw new Error(j.error ?? '업로드 실패')
+      }
+      const upData = await upRes.json()
+      // 업로드된 URL을 메뉴에 PATCH
+      const patchRes = await fetch(`/api/menus/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: upData.url }),
+      })
+      if (!patchRes.ok) throw new Error('이미지 저장 실패')
+      setImageUrlInput(upData.url)
+      flash('success', '메뉴 사진이 저장되었습니다.')
+      fetchAll()
+    } catch (e) {
+      flash('error', e instanceof Error ? e.message : '업로드 실패')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -185,6 +274,8 @@ export default function MenuPage() {
     setAddRecipeOpen(false)
     setRecipeSearch('')
     setThresholdInput('')
+    setCookingStepsInput('')
+    setImageUrlInput('')
   }
 
   function addRecipeRow(item: InventoryItem) {
@@ -415,6 +506,50 @@ export default function MenuPage() {
         </div>
       )}
 
+      {/* 오늘 등록된 매출 항목 (취소 가능) */}
+      {!loading && todayItems.length > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-gray-700">📅 오늘 매출 ({todayItems.length}건)</p>
+            <p className="text-xs font-semibold text-gray-700">
+              {formatWon(todayItems.reduce((s, i) => s + i.subtotal, 0))}
+            </p>
+          </div>
+          <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+            {todayItems.map((it) => (
+              <li
+                key={it.id}
+                className="flex items-center justify-between gap-2 bg-gray-50 rounded-xl px-3 py-2"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-gray-800 truncate">
+                      {it.menuName}
+                    </span>
+                    <span className="text-xs text-gray-500">× {it.qty}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400">
+                    {new Date(it.createdAt).toLocaleTimeString('ko-KR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })} · {formatWon(it.subtotal)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => undoSaleItem(it.id, it.menuName)}
+                  className="flex-shrink-0 text-xs text-rose-500 hover:text-rose-600 px-2 py-1 rounded-lg hover:bg-rose-50 font-medium"
+                >
+                  취소
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-gray-400 mt-2">
+            취소 시 재고가 자동으로 복구되고 변동 이력이 기록됩니다.
+          </p>
+        </div>
+      )}
+
       {/* 목록 */}
       {loading ? (
         <div className="flex justify-center py-12">
@@ -436,7 +571,16 @@ export default function MenuPage() {
               onClick={() => openEditMenu(m)}
               className="bg-white rounded-2xl border border-gray-100 p-3 cursor-pointer hover:border-orange-300 transition-colors"
             >
-              <div className="flex items-start justify-between gap-2 mb-1.5">
+              <div className="flex items-start gap-3 mb-1.5">
+                {/* 메뉴 사진 썸네일 */}
+                {m.imageUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={m.imageUrl}
+                    alt={m.name}
+                    className="w-16 h-16 rounded-lg object-cover ring-1 ring-gray-200 flex-shrink-0"
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="text-sm font-bold text-gray-900">{m.name}</p>
@@ -453,6 +597,11 @@ export default function MenuPage() {
                     {m.costRatioThreshold != null && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
                         ⚠ 임계 {m.costRatioThreshold}%
+                      </span>
+                    )}
+                    {m.cookingSteps && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        📖 조리법
                       </span>
                     )}
                   </div>
@@ -719,6 +868,77 @@ export default function MenuPage() {
               )}
 
               {/* 실시간 원가 */}
+              {/* 메뉴 사진 */}
+              <div className="bg-purple-50 rounded-xl p-3 border border-purple-200 space-y-2">
+                <p className="text-xs font-semibold text-purple-700">📸 메뉴 사진</p>
+                {imageUrlInput ? (
+                  <div className="space-y-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imageUrlInput}
+                      alt="메뉴"
+                      className="w-full max-h-48 object-cover rounded-lg ring-1 ring-gray-200"
+                    />
+                    <button
+                      onClick={() => {
+                        const inp = document.getElementById('menu-photo-input') as HTMLInputElement
+                        inp?.click()
+                      }}
+                      className="w-full py-2 rounded-lg bg-white text-xs text-purple-700 border border-purple-300"
+                    >
+                      📷 사진 변경
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const inp = document.getElementById('menu-photo-input') as HTMLInputElement
+                      inp?.click()
+                    }}
+                    className="w-full py-3 rounded-lg bg-white text-sm text-purple-700 border-2 border-dashed border-purple-300 hover:border-purple-500"
+                  >
+                    📷 메뉴 사진 추가
+                  </button>
+                )}
+                <input
+                  id="menu-photo-input"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    e.target.value = ''
+                    if (f) uploadMenuImage(f)
+                  }}
+                />
+              </div>
+
+              {/* 조리 매뉴얼 */}
+              <div className="bg-amber-50 rounded-xl p-3 border border-amber-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-amber-700">📖 조리 매뉴얼</p>
+                  <p className="text-[10px] text-amber-600">직원 교육·일관된 맛 유지</p>
+                </div>
+                <textarea
+                  value={cookingStepsInput}
+                  onChange={(e) => setCookingStepsInput(e.target.value)}
+                  placeholder={`예시:\n1. 쌀 200g을 30분 불린다\n2. 압력솥에 안친다\n3. 양념장(고추장 30g + 참기름 5g) 만들기\n4. 채소를 데친다\n5. 그릇에 담고 양념장 올리기`}
+                  rows={6}
+                  className="w-full px-3 py-2 rounded-lg border border-amber-300 text-sm bg-white resize-none"
+                />
+                <button
+                  onClick={saveCookingSteps}
+                  disabled={submitting}
+                  className="w-full py-1.5 rounded-lg bg-amber-500 text-white text-xs font-bold disabled:opacity-50"
+                >
+                  조리 매뉴얼 저장
+                </button>
+                <p className="text-[10px] text-amber-700">
+                  레시피(재료)와 조리 매뉴얼(조리법)이 함께 저장되어 신입 직원이 보고 따라 만들 수 있어요.
+                </p>
+              </div>
+
               {/* 임계 원가율 설정 */}
               <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 space-y-2">
                 <div className="flex items-center justify-between">
