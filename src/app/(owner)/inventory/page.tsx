@@ -68,7 +68,30 @@ const PRESET_CATEGORIES = [
 
 const MASS_UNITS = ['kg', 'g'] as const
 const VOLUME_UNITS = ['L', 'ml'] as const
-const COUNT_UNITS = ['개', '박스', '병', '봉', '캔', '통', '팩', '포', '묶음', '세트', '근'] as const
+const COUNT_UNITS = [
+  '개',
+  '마리',
+  '알',
+  '단',
+  '손',
+  '다발',
+  '송이',
+  '쪽',
+  '장',
+  '줄',
+  '박스',
+  '상자',
+  '병',
+  '봉',
+  '봉지',
+  '캔',
+  '통',
+  '팩',
+  '포',
+  '묶음',
+  '세트',
+  '근',
+] as const
 
 function deriveUnitType(unit: string | null | undefined): UnitType {
   if (!unit) return 'count'
