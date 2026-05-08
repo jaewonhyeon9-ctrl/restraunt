@@ -961,23 +961,39 @@ export default function MenuPage() {
                           : '재고 없음'}
                       </p>
                     ) : (
-                      filteredInventory.map((i) => (
-                        <button
-                          key={i.id}
-                          onClick={() => addRecipeRow(i)}
-                          className="w-full text-left px-3 py-2 rounded-lg bg-white hover:bg-blue-100 text-xs flex items-center justify-between active:scale-95 transition-transform"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-800 truncate">{i.name}</p>
-                            {i.category && (
-                              <p className="text-[10px] text-gray-400">{i.category}</p>
-                            )}
-                          </div>
-                          <span className="text-gray-400 text-[11px] ml-2">
-                            {i.unitPrice != null ? formatWon(i.unitPrice) : '단가 없음'}/{i.unit}
-                          </span>
-                        </button>
-                      ))
+                      filteredInventory.map((i) => {
+                        const ut = deriveUnitType(i.unit)
+                        const ppg = pricePerG(i.unitPrice, i.packageWeightG)
+                        const baseLabel = ut === 'volume' ? 'ml' : 'g'
+                        const needsSetup = ut !== 'count' && !i.packageWeightG
+                        return (
+                          <button
+                            key={i.id}
+                            onClick={() => addRecipeRow(i)}
+                            className="w-full text-left px-3 py-2 rounded-lg bg-white hover:bg-blue-100 text-xs flex items-center justify-between active:scale-95 transition-transform"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-800 truncate">{i.name}</p>
+                              {i.category && (
+                                <p className="text-[10px] text-gray-400">{i.category}</p>
+                              )}
+                            </div>
+                            <span className="text-[11px] ml-2 whitespace-nowrap">
+                              {ppg != null ? (
+                                <span className="font-bold text-emerald-600">
+                                  {formatWon(ppg)}/{baseLabel}
+                                </span>
+                              ) : needsSetup ? (
+                                <span className="text-rose-500">⚠ 중량 미설정</span>
+                              ) : (
+                                <span className="text-gray-400">
+                                  {i.unitPrice != null ? formatWon(i.unitPrice) : '단가 없음'}/{i.unit}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        )
+                      })
                     )}
                   </div>
 
