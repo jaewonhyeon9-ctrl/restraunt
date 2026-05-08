@@ -853,15 +853,33 @@ export default function OwnerInventoryPage() {
                 </div>
               )}
 
-              {/* 1g/1ml당 가격 미리보기 */}
-              {formPricePerG != null && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                  <p className="text-xs text-emerald-700">
-                    <span className="font-bold">1{form.unitType === 'volume' ? 'ml' : 'g'}당 {formatWon(formPricePerG)}</span>
-                    <span className="text-[10px] text-emerald-600 ml-2">— 레시피 원가 자동 계산에 사용</span>
-                  </p>
-                </div>
-              )}
+              {/* 가격 미리보기: 1단위당 + 1g/ml당 */}
+              {(() => {
+                const qty = Number(form.packageQty)
+                const price = Number(form.packagePrice)
+                if (!qty || !price || qty <= 0) return null
+                const perUnit = price / qty
+                const baseLabel = form.unitType === 'volume' ? 'ml' : 'g'
+                return (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 space-y-0.5">
+                    <p className="text-xs text-emerald-700 flex items-center justify-between">
+                      <span>1{form.packageUnit}당</span>
+                      <span className="font-bold">{formatWon(perUnit)}</span>
+                    </p>
+                    {formPricePerG != null && (
+                      <p className="text-xs text-emerald-700 flex items-center justify-between border-t border-emerald-200 pt-0.5">
+                        <span>1{baseLabel}당</span>
+                        <span className="font-bold">{formatWon(formPricePerG)}</span>
+                      </p>
+                    )}
+                    {formPricePerG != null && (
+                      <p className="text-[10px] text-emerald-600 pt-0.5">
+                        — 1{baseLabel}당 가격은 레시피 원가 자동 계산에 사용
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
