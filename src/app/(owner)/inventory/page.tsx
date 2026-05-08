@@ -97,6 +97,19 @@ function pricePerG(item: InventoryItem): number | null {
   return item.unitPrice / item.packageWeightG
 }
 
+// 품목명에서 규격 자동 감지 (예: "3.5kg", "20kg", "1L", "500g", "350ml")
+function detectPackageWeightG(name: string): number | null {
+  const matches = [...name.matchAll(/(\d+(?:\.\d+)?)\s*(kg|g|L|l|ml|cc)\b/gi)]
+  if (matches.length === 0) return null
+  const last = matches[matches.length - 1]
+  const value = parseFloat(last[1])
+  const unit = last[2].toLowerCase()
+  if (!Number.isFinite(value) || value <= 0) return null
+  if (unit === 'kg' || unit === 'l') return value * 1000
+  if (unit === 'g' || unit === 'ml' || unit === 'cc') return value
+  return null
+}
+
 function formatWon(n: number | null): string {
   if (n == null) return '-'
   if (n >= 10000) return `${Math.round(n).toLocaleString()}원`
@@ -284,6 +297,46 @@ export default function OwnerInventoryPage() {
       return { ...p, unitType: next, packageUnit: defaultUnit, perPieceVolume: '' }
     })
   }
+
+  // 한 품목 자동 설정
+  async function autoSetItem(itemId: string, weightG: number) {
+    const res = await fetch(`/api/inventory/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packageWeightG: weightG }),
+    })
+    if (!res.ok) return false
+    setItems((prev) =>
+      prev.map((i) => (i.id === itemId ? { ...i, packageWeightG: weightG } : i)),
+    )
+    return true
+  }
+
+  // 일괄 자동 설정 (이름에서 감지된 모든 품목)
+  const [bulkRunning, setBulkRunning] = useState(false)
+  async function runBulkAutoDetect() {
+    const candidates = items.filter((i) => !i.packageWeightG && detectPackageWeightG(i.name) != null)
+    if (candidates.length === 0) {
+      setError('자동 감지 가능한 품목이 없습니다.')
+      return
+    }
+    if (!confirm(`${candidates.length}개 품목의 규격을 이름에서 자동으로 설정합니다. 진행할까요?`)) return
+    setBulkRunning(true)
+    let success = 0
+    for (const item of candidates) {
+      const w = detectPackageWeightG(item.name)
+      if (w == null) continue
+      const ok = await autoSetItem(item.id, w)
+      if (ok) success++
+    }
+    setBulkRunning(false)
+    setError(`✅ ${success}/${candidates.length}개 품목이 자동 설정되었습니다.`)
+  }
+
+  const bulkCandidatesCount = useMemo(
+    () => items.filter((i) => !i.packageWeightG && detectPackageWeightG(i.name) != null).length,
+    [items],
+  )
 
   // 폼 미리보기용 1g/ml당 가격
   const formPricePerG = useMemo(() => {
@@ -481,6 +534,27 @@ export default function OwnerInventoryPage() {
             <option value="supplier">거래처별 그룹</option>
             <option value="none">그룹 없음</option>
           </select>
+        </div>
+      )}
+
+      {/* 일괄 자동 설정 배너 */}
+      {!loading && bulkCandidatesCount > 0 && (
+        <div className="mb-3 bg-violet-50 border border-violet-200 rounded-xl p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-violet-700">🪄 1g당 가격 자동 설정 가능</p>
+              <p className="text-[11px] text-violet-600 mt-0.5">
+                {bulkCandidatesCount}개 품목의 이름에서 규격(kg/g/L/ml)을 감지했어요
+              </p>
+            </div>
+            <button
+              onClick={runBulkAutoDetect}
+              disabled={bulkRunning}
+              className="px-3 py-2 bg-violet-600 text-white text-xs font-bold rounded-lg disabled:opacity-50 whitespace-nowrap"
+            >
+              {bulkRunning ? '진행 중...' : `일괄 설정 (${bulkCandidatesCount})`}
+            </button>
+          </div>
         </div>
       )}
 
