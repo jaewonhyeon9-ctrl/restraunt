@@ -29,10 +29,35 @@ interface InventoryItem {
 
 interface RecipeRow {
   inventoryItemId: string
-  qtyUsed: number
+  qtyUsed: number               // 재고 unit 기준 (예: 0.1 kg)
   itemName: string
   itemUnit: string
   itemUnitPrice: number | null
+  itemPackageWeightG: number | null  // 1단위당 g/ml — 입력 변환용
+  itemUnitType: 'mass' | 'volume' | 'count'
+}
+
+function deriveUnitType(unit: string): 'mass' | 'volume' | 'count' {
+  const u = unit.toLowerCase()
+  if (['kg', 'g'].includes(u)) return 'mass'
+  if (['l', 'ml', 'cc'].includes(u)) return 'volume'
+  return 'count'
+}
+
+// 메뉴 1개당 사용량을 g/ml로 환산해서 표시
+function qtyUsedAsBase(row: RecipeRow): number {
+  if (!row.itemPackageWeightG) return row.qtyUsed
+  return row.qtyUsed * row.itemPackageWeightG
+}
+// 사용자가 g/ml로 입력한 값을 재고 unit으로 변환
+function baseInputToQtyUsed(inputG: number, packageWeightG: number | null): number {
+  if (!packageWeightG || packageWeightG <= 0) return inputG
+  return inputG / packageWeightG
+}
+// 재고 1g/ml당 가격
+function pricePerG(itemUnitPrice: number | null, packageWeightG: number | null): number | null {
+  if (itemUnitPrice == null || !packageWeightG || packageWeightG <= 0) return null
+  return itemUnitPrice / packageWeightG
 }
 
 function formatWon(n: number | null): string {
@@ -174,13 +199,15 @@ export default function MenuPage() {
         (data.recipes as Array<{
           inventoryItemId: string
           qtyUsed: number
-          item: { name: string; unit: string; unitPrice: number | null }
+          item: { name: string; unit: string; unitPrice: number | null; packageWeightG: number | null }
         }>).map((r) => ({
           inventoryItemId: r.inventoryItemId,
           qtyUsed: r.qtyUsed,
           itemName: r.item.name,
           itemUnit: r.item.unit,
           itemUnitPrice: r.item.unitPrice,
+          itemPackageWeightG: r.item.packageWeightG ?? null,
+          itemUnitType: deriveUnitType(r.item.unit),
         })),
       )
     } catch {
@@ -281,14 +308,23 @@ export default function MenuPage() {
 
   function addRecipeRow(item: InventoryItem) {
     if (recipeRows.some((r) => r.inventoryItemId === item.id)) return
+    const ut = deriveUnitType(item.unit)
+    // 기본 1g/ml 입력으로 시작 (mass/volume) 또는 1단위 (count)
+    const defaultQtyUsed = ut === 'count'
+      ? 1
+      : item.packageWeightG && item.packageWeightG > 0
+        ? 1 / item.packageWeightG  // 1g 또는 1ml
+        : 1
     setRecipeRows((prev) => [
       ...prev,
       {
         inventoryItemId: item.id,
-        qtyUsed: 1,
+        qtyUsed: defaultQtyUsed,
         itemName: item.name,
         itemUnit: item.unit,
         itemUnitPrice: item.unitPrice,
+        itemPackageWeightG: item.packageWeightG ?? null,
+        itemUnitType: ut,
       },
     ])
     // 닫지 않음 — 사용자가 연속해서 여러 재료 추가 가능
@@ -297,6 +333,16 @@ export default function MenuPage() {
   function updateQty(id: string, qty: number) {
     setRecipeRows((prev) =>
       prev.map((r) => (r.inventoryItemId === id ? { ...r, qtyUsed: qty } : r)),
+    )
+  }
+
+  function updateQtyFromBaseInput(id: string, inputBase: number) {
+    setRecipeRows((prev) =>
+      prev.map((r) =>
+        r.inventoryItemId === id
+          ? { ...r, qtyUsed: baseInputToQtyUsed(inputBase, r.itemPackageWeightG) }
+          : r,
+      ),
     )
   }
 
@@ -787,8 +833,16 @@ export default function MenuPage() {
               ) : (
                 <ul className="space-y-2">
                   {recipeRows.map((r) => {
-                    const cost =
-                      r.itemUnitPrice != null ? r.qtyUsed * r.itemUnitPrice : null
+                    const ppg = pricePerG(r.itemUnitPrice, r.itemPackageWeightG)
+                    // count 모드 + packageWeightG 없으면 기존 방식 (qtyUsed × unitPrice)
+                    const useGramInput = r.itemUnitType !== 'count' && r.itemPackageWeightG != null
+                    const baseLabel = r.itemUnitType === 'volume' ? 'ml' : 'g'
+                    const inputValue = useGramInput ? qtyUsedAsBase(r) : r.qtyUsed
+                    const cost = useGramInput && ppg != null
+                      ? inputValue * ppg
+                      : r.itemUnitPrice != null
+                        ? r.qtyUsed * r.itemUnitPrice
+                        : null
                     return (
                       <li
                         key={r.inventoryItemId}
@@ -800,7 +854,12 @@ export default function MenuPage() {
                               {r.itemName}
                             </p>
                             <p className="text-[10px] text-gray-400">
-                              단가 {formatWon(r.itemUnitPrice)} / {r.itemUnit}
+                              {ppg != null
+                                ? `1${baseLabel}당 ${formatWon(ppg)}`
+                                : `단가 ${formatWon(r.itemUnitPrice)} / ${r.itemUnit}`}
+                              {!r.itemPackageWeightG && r.itemUnitType !== 'count' && (
+                                <span className="ml-1 text-rose-500">⚠ 패키지 중량 미설정</span>
+                              )}
                             </p>
                           </div>
                           <button
@@ -813,16 +872,21 @@ export default function MenuPage() {
                         <div className="flex items-center gap-2 mt-2">
                           <input
                             type="number"
-                            step="0.01"
+                            step={useGramInput ? '1' : '0.01'}
                             min="0"
-                            value={r.qtyUsed}
-                            onChange={(e) =>
-                              updateQty(r.inventoryItemId, Number(e.target.value))
-                            }
+                            value={Number.isFinite(inputValue) ? Number(inputValue.toFixed(useGramInput ? 1 : 3)) : 0}
+                            onChange={(e) => {
+                              const v = Number(e.target.value)
+                              if (useGramInput) {
+                                updateQtyFromBaseInput(r.inventoryItemId, v)
+                              } else {
+                                updateQty(r.inventoryItemId, v)
+                              }
+                            }}
                             className="flex-1 px-2 py-1.5 rounded-lg border border-gray-200 text-sm bg-white"
                           />
                           <span className="text-xs text-gray-500 whitespace-nowrap">
-                            {r.itemUnit} × 1메뉴
+                            {useGramInput ? baseLabel : r.itemUnit} × 1메뉴
                           </span>
                           {cost != null && (
                             <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">

@@ -22,12 +22,16 @@ interface InventoryItem {
   supplier: Supplier | null
 }
 
+type UnitType = 'mass' | 'volume' | 'count'
+
 interface AddItemForm {
   name: string
   manufacturer: string
-  unit: string
-  unitPrice: string
-  packageWeightG: string
+  unitType: UnitType
+  packageQty: string         // 패키지 사이즈 숫자 (예: "20")
+  packageUnit: string        // 패키지 단위 (kg/g/L/ml/개/박스/...)
+  packagePrice: string       // 패키지 총 가격 (원)
+  perPieceVolume: string     // count 모드 — 1단위당 g/ml
   safetyStock: string
   currentStock: string
   category: string
@@ -37,30 +41,68 @@ interface AddItemForm {
 const EMPTY_FORM: AddItemForm = {
   name: '',
   manufacturer: '',
-  unit: '',
-  unitPrice: '',
-  packageWeightG: '',
+  unitType: 'mass',
+  packageQty: '',
+  packageUnit: 'kg',
+  packagePrice: '',
+  perPieceVolume: '',
   safetyStock: '',
   currentStock: '',
   category: '',
   supplierId: '',
 }
 
-type SortMode = 'name' | 'pricePer10g_asc' | 'pricePer10g_desc' | 'lowStock'
+const PRESET_CATEGORIES = [
+  '쌀/곡물',
+  '육류',
+  '해산물',
+  '채소',
+  '과일',
+  '양념/조미료',
+  '유제품',
+  '음료',
+  '면류',
+  '주류',
+  '기타',
+] as const
+
+const MASS_UNITS = ['kg', 'g'] as const
+const VOLUME_UNITS = ['L', 'ml'] as const
+const COUNT_UNITS = ['개', '박스', '병', '봉', '캔', '통', '팩', '포', '묶음', '세트', '근'] as const
+
+function deriveUnitType(unit: string | null | undefined): UnitType {
+  if (!unit) return 'count'
+  const u = unit.toLowerCase()
+  if (['kg', 'g'].includes(u)) return 'mass'
+  if (['l', 'ml', 'cc'].includes(u)) return 'volume'
+  return 'count'
+}
+
+function unitToPackageWeightG(unit: string): number | null {
+  const u = unit.toLowerCase()
+  if (u === 'kg') return 1000
+  if (u === 'g') return 1
+  if (u === 'l') return 1000
+  if (u === 'ml' || u === 'cc') return 1
+  return null
+}
+
+type SortMode = 'name' | 'pricePerG_asc' | 'pricePerG_desc' | 'lowStock'
 type GroupMode = 'supplier' | 'none'
 
-function pricePer10g(item: InventoryItem): number | null {
+function pricePerG(item: InventoryItem): number | null {
   if (item.unitPrice == null || !item.packageWeightG || item.packageWeightG <= 0) {
     return null
   }
-  return (item.unitPrice / item.packageWeightG) * 10
+  return item.unitPrice / item.packageWeightG
 }
 
 function formatWon(n: number | null): string {
   if (n == null) return '-'
   if (n >= 10000) return `${Math.round(n).toLocaleString()}원`
   if (n >= 100) return `${Math.round(n).toLocaleString()}원`
-  return `${n.toFixed(1)}원`
+  if (n >= 1) return `${n.toFixed(1)}원`
+  return `${n.toFixed(2)}원`
 }
 
 export default function OwnerInventoryPage() {
@@ -119,12 +161,29 @@ export default function OwnerInventoryPage() {
 
   function openEdit(item: InventoryItem) {
     setEditTarget(item)
+    const ut = deriveUnitType(item.unit)
+    const baseFactor = unitToPackageWeightG(item.unit) // kg→1000, g→1, L→1000, ml→1
+    let packageQty = '1'
+    let packagePrice = item.unitPrice != null ? String(item.unitPrice) : ''
+    let perPieceVolume = ''
+    if ((ut === 'mass' || ut === 'volume') && baseFactor && item.packageWeightG && item.packageWeightG > 0) {
+      // 레거시 호환: packageWeightG가 baseFactor와 다르면 "per-package" 컨벤션으로 간주
+      if (Math.abs(item.packageWeightG - baseFactor) >= 0.01) {
+        const qty = item.packageWeightG / baseFactor
+        packageQty = Number.isInteger(qty) ? String(qty) : qty.toFixed(2)
+        // packagePrice는 unitPrice 그대로 (레거시에서 unitPrice가 패키지 총액으로 저장됨)
+      }
+    } else if (ut === 'count' && item.packageWeightG != null) {
+      perPieceVolume = String(item.packageWeightG)
+    }
     setForm({
       name: item.name,
       manufacturer: item.manufacturer ?? '',
-      unit: item.unit,
-      unitPrice: item.unitPrice != null ? String(item.unitPrice) : '',
-      packageWeightG: item.packageWeightG != null ? String(item.packageWeightG) : '',
+      unitType: ut,
+      packageQty,
+      packageUnit: item.unit || (ut === 'mass' ? 'kg' : ut === 'volume' ? 'L' : '개'),
+      packagePrice,
+      perPieceVolume,
       safetyStock: item.safetyStock != null ? String(item.safetyStock) : '',
       currentStock: String(item.currentStock),
       category: item.category ?? '',
@@ -147,12 +206,29 @@ export default function OwnerInventoryPage() {
     setSubmitting(true)
     setError('')
     try {
+      const qty = Number(form.packageQty)
+      const price = Number(form.packagePrice)
+      if (!form.packageUnit || !qty || qty <= 0) {
+        throw new Error('패키지 단위와 사이즈를 입력하세요.')
+      }
+      // unitPrice = 1단위당 가격 (예: 1kg당 가격)
+      const unitPrice = price && qty ? price / qty : null
+      // packageWeightG = 1단위당 g/ml
+      let packageWeightG: number | null = null
+      if (form.unitType === 'mass' || form.unitType === 'volume') {
+        packageWeightG = unitToPackageWeightG(form.packageUnit)
+      } else {
+        // count: 사용자가 직접 입력한 1단위당 g/ml
+        const ppv = Number(form.perPieceVolume)
+        packageWeightG = ppv > 0 ? ppv : null
+      }
+
       const payload = {
         name: form.name,
         manufacturer: form.manufacturer || null,
-        unit: form.unit,
-        unitPrice: form.unitPrice ? Number(form.unitPrice) : null,
-        packageWeightG: form.packageWeightG ? Number(form.packageWeightG) : null,
+        unit: form.packageUnit,
+        unitPrice,
+        packageWeightG,
         safetyStock: form.safetyStock ? Number(form.safetyStock) : null,
         currentStock: form.currentStock ? Number(form.currentStock) : 0,
         category: form.category || null,
@@ -180,6 +256,50 @@ export default function OwnerInventoryPage() {
     }
   }
 
+  async function handleAiClassify() {
+    if (!form.name) {
+      setError('품목명을 먼저 입력하세요.')
+      return
+    }
+    try {
+      const res = await fetch('/api/inventory/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: form.name, manufacturer: form.manufacturer }),
+      })
+      const data = (await res.json()) as { category: string | null; reason?: string }
+      if (data.category) {
+        setForm((p) => ({ ...p, category: data.category as string }))
+      } else {
+        setError('AI가 분류를 정하지 못했습니다. 직접 선택해주세요.')
+      }
+    } catch {
+      setError('AI 분류 실패')
+    }
+  }
+
+  function changeUnitType(next: UnitType) {
+    setForm((p) => {
+      const defaultUnit = next === 'mass' ? 'kg' : next === 'volume' ? 'L' : '개'
+      return { ...p, unitType: next, packageUnit: defaultUnit, perPieceVolume: '' }
+    })
+  }
+
+  // 폼 미리보기용 1g/ml당 가격
+  const formPricePerG = useMemo(() => {
+    const qty = Number(form.packageQty)
+    const price = Number(form.packagePrice)
+    if (!qty || !price || qty <= 0) return null
+    if (form.unitType === 'mass' || form.unitType === 'volume') {
+      const factor = unitToPackageWeightG(form.packageUnit)
+      if (!factor || factor <= 0) return null
+      return price / (qty * factor)
+    }
+    const ppv = Number(form.perPieceVolume)
+    if (!ppv || ppv <= 0) return null
+    return price / (qty * ppv)
+  }, [form.unitType, form.packageQty, form.packageUnit, form.packagePrice, form.perPieceVolume])
+
   async function handleDeleteItem(item: InventoryItem) {
     if (!confirm(`"${item.name}"을(를) 재고에서 삭제할까요?\n(데이터는 보존되며 목록에서만 사라집니다.)`)) return
     try {
@@ -199,17 +319,17 @@ export default function OwnerInventoryPage() {
     const arr = [...items]
     arr.sort((a, b) => {
       if (sortMode === 'name') return a.name.localeCompare(b.name)
-      if (sortMode === 'pricePer10g_asc') {
-        const av = pricePer10g(a)
-        const bv = pricePer10g(b)
+      if (sortMode === 'pricePerG_asc') {
+        const av = pricePerG(a)
+        const bv = pricePerG(b)
         if (av == null && bv == null) return a.name.localeCompare(b.name)
         if (av == null) return 1
         if (bv == null) return -1
         return av - bv
       }
-      if (sortMode === 'pricePer10g_desc') {
-        const av = pricePer10g(a)
-        const bv = pricePer10g(b)
+      if (sortMode === 'pricePerG_desc') {
+        const av = pricePerG(a)
+        const bv = pricePerG(b)
         if (av == null && bv == null) return a.name.localeCompare(b.name)
         if (av == null) return 1
         if (bv == null) return -1
@@ -349,8 +469,8 @@ export default function OwnerInventoryPage() {
             className="text-xs border border-gray-200 rounded-lg bg-white px-2 py-1.5 flex-shrink-0"
           >
             <option value="name">이름순</option>
-            <option value="pricePer10g_asc">10g당 가격 낮은 순</option>
-            <option value="pricePer10g_desc">10g당 가격 높은 순</option>
+            <option value="pricePerG_asc">1g당 가격 낮은 순</option>
+            <option value="pricePerG_desc">1g당 가격 높은 순</option>
             <option value="lowStock">부족 우선</option>
           </select>
           <select
@@ -392,7 +512,7 @@ export default function OwnerInventoryPage() {
               <div className="px-3 py-2 grid grid-cols-12 gap-1 text-[10px] font-semibold text-gray-400 border-b border-gray-50">
                 <span className="col-span-5">품목 / 제조사</span>
                 <span className="col-span-3 text-right">가격</span>
-                <span className="col-span-2 text-right">10g당</span>
+                <span className="col-span-2 text-right">1g당</span>
                 <span className="col-span-2 text-right">재고</span>
               </div>
 
@@ -401,7 +521,7 @@ export default function OwnerInventoryPage() {
                 {group.items.map((item) => {
                   const isLow =
                     item.safetyStock !== null && item.currentStock <= item.safetyStock
-                  const per10g = pricePer10g(item)
+                  const perG = pricePerG(item)
                   return (
                     <li
                       key={item.id}
@@ -443,9 +563,9 @@ export default function OwnerInventoryPage() {
 
                       {/* 10g당 가격 */}
                       <div className="col-span-2 text-right">
-                        {per10g != null ? (
+                        {perG != null ? (
                           <p className="text-sm font-bold text-emerald-600">
-                            {formatWon(per10g)}
+                            {formatWon(perG)}
                           </p>
                         ) : (
                           <p className="text-xs text-gray-300">-</p>
@@ -544,55 +664,107 @@ export default function OwnerInventoryPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    단위 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.unit}
-                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                    placeholder="kg, 개, 병"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                    required
-                  />
+              {/* 단위 유형 chip selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  단위 유형 <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-1.5">
+                  {(['mass', 'volume', 'count'] as UnitType[]).map((t) => {
+                    const label = t === 'mass' ? '무게 (kg/g)' : t === 'volume' ? '용량 (L/ml)' : '갯수 (개/박스 등)'
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => changeUnitType(t)}
+                        className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                          form.unitType === t
+                            ? 'bg-orange-500 text-white border-orange-500'
+                            : 'bg-white text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
                 </div>
-                <div>
+              </div>
+
+              {/* 패키지 사이즈 + 단위 + 가격 */}
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-4">
                   <label className="block text-xs font-medium text-gray-600 mb-1">
-                    단가 (원)
+                    사이즈 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     min="0"
-                    value={form.unitPrice}
-                    onChange={(e) => setForm({ ...form, unitPrice: e.target.value })}
-                    placeholder="0"
+                    step="0.01"
+                    value={form.packageQty}
+                    onChange={(e) => setForm({ ...form, packageQty: e.target.value })}
+                    placeholder="20"
+                    required
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">단위</label>
+                  <select
+                    value={form.packageUnit}
+                    onChange={(e) => setForm({ ...form, packageUnit: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  >
+                    {(form.unitType === 'mass'
+                      ? MASS_UNITS
+                      : form.unitType === 'volume'
+                      ? VOLUME_UNITS
+                      : COUNT_UNITS
+                    ).map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-5">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">총 가격 (원)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.packagePrice}
+                    onChange={(e) => setForm({ ...form, packagePrice: e.target.value })}
+                    placeholder="50000"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  패키지 중량 (g)
-                  <span className="ml-1 text-[10px] font-normal text-gray-400">— 10g당 가격 환산용</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={form.packageWeightG}
-                  onChange={(e) => setForm({ ...form, packageWeightG: e.target.value })}
-                  placeholder="예) 5kg → 5000, 350g → 350"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-                {form.unitPrice && form.packageWeightG && Number(form.packageWeightG) > 0 && (
-                  <p className="text-[10px] text-emerald-600 mt-1">
-                    → 10g당 {formatWon((Number(form.unitPrice) / Number(form.packageWeightG)) * 10)}
+              {/* 갯수 모드일 때만: 1개당 g/ml */}
+              {form.unitType === 'count' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    1{form.packageUnit}당 용량 (g 또는 ml) <span className="text-red-500">*</span>
+                    <span className="ml-1 text-[10px] font-normal text-gray-400">— 1g당 가격 환산용</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={form.perPieceVolume}
+                    onChange={(e) => setForm({ ...form, perPieceVolume: e.target.value })}
+                    placeholder={`예) 1${form.packageUnit}이 350g이면 350`}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              )}
+
+              {/* 1g/1ml당 가격 미리보기 */}
+              {formPricePerG != null && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                  <p className="text-xs text-emerald-700">
+                    <span className="font-bold">1{form.unitType === 'volume' ? 'ml' : 'g'}당 {formatWon(formPricePerG)}</span>
+                    <span className="text-[10px] text-emerald-600 ml-2">— 레시피 원가 자동 계산에 사용</span>
                   </p>
-                )}
-              </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -622,13 +794,39 @@ export default function OwnerInventoryPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">카테고리</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-gray-600">재료 분류</label>
+                  <button
+                    type="button"
+                    onClick={handleAiClassify}
+                    disabled={!form.name}
+                    className="text-[11px] px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 font-medium hover:bg-violet-200 disabled:opacity-50"
+                  >
+                    🤖 AI 자동분류
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {PRESET_CATEGORIES.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setForm({ ...form, category: form.category === c ? '' : c })}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                        form.category === c
+                          ? 'bg-orange-500 text-white border-orange-500'
+                          : 'bg-white text-gray-600 border-gray-200'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="예) 육류, 채소, 음료"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  placeholder="직접 입력도 가능"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
               </div>
 
