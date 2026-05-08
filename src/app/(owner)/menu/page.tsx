@@ -60,6 +60,21 @@ function pricePerG(itemUnitPrice: number | null, packageWeightG: number | null):
   return itemUnitPrice / packageWeightG
 }
 
+// 품목명에서 규격 자동 감지 (예: "3.5kg", "20kg", "1L", "500g", "350ml")
+// 반환: 1단위당 g/ml로 환산된 값
+function detectPackageWeightG(name: string): number | null {
+  // 가장 마지막에 나오는 숫자+단위 패턴 우선 (이름 끝쪽 규격이 더 정확)
+  const matches = [...name.matchAll(/(\d+(?:\.\d+)?)\s*(kg|g|L|l|ml|cc)\b/gi)]
+  if (matches.length === 0) return null
+  const last = matches[matches.length - 1]
+  const value = parseFloat(last[1])
+  const unit = last[2].toLowerCase()
+  if (!Number.isFinite(value) || value <= 0) return null
+  if (unit === 'kg' || unit === 'l') return value * 1000
+  if (unit === 'g' || unit === 'ml' || unit === 'cc') return value
+  return null
+}
+
 function formatWon(n: number | null): string {
   if (n == null) return '-'
   return `${Math.round(n).toLocaleString()}원`
@@ -344,6 +359,37 @@ export default function MenuPage() {
           : r,
       ),
     )
+  }
+
+  // 재고 품목의 packageWeightG 자동 설정 (이름에서 감지된 규격으로)
+  async function autoSetPackageWeight(itemId: string, weightG: number) {
+    try {
+      const res = await fetch(`/api/inventory/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageWeightG: weightG }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error ?? '설정 실패')
+      }
+      // 로컬 상태 업데이트
+      setRecipeRows((prev) =>
+        prev.map((r) =>
+          r.inventoryItemId === itemId
+            ? { ...r, itemPackageWeightG: weightG }
+            : r,
+        ),
+      )
+      setInventory((prev) =>
+        prev.map((i) =>
+          i.id === itemId ? { ...i, packageWeightG: weightG } : i,
+        ),
+      )
+      flash('success', `중량 ${weightG >= 1000 ? `${weightG/1000}kg` : `${weightG}g`}로 설정됨`)
+    } catch (e) {
+      flash('error', e instanceof Error ? e.message : '설정 실패')
+    }
   }
 
   function removeRow(id: string) {
@@ -834,8 +880,8 @@ export default function MenuPage() {
                 <ul className="space-y-2">
                   {recipeRows.map((r) => {
                     const ppg = pricePerG(r.itemUnitPrice, r.itemPackageWeightG)
-                    // count 모드 + packageWeightG 없으면 기존 방식 (qtyUsed × unitPrice)
-                    const useGramInput = r.itemUnitType !== 'count' && r.itemPackageWeightG != null
+                    // packageWeightG가 있으면 g/ml 입력 모드 (unitType 무관)
+                    const useGramInput = r.itemPackageWeightG != null && r.itemPackageWeightG > 0
                     const baseLabel = r.itemUnitType === 'volume' ? 'ml' : 'g'
                     const inputValue = useGramInput ? qtyUsedAsBase(r) : r.qtyUsed
                     const cost = useGramInput && ppg != null
@@ -843,6 +889,8 @@ export default function MenuPage() {
                       : r.itemUnitPrice != null
                         ? r.qtyUsed * r.itemUnitPrice
                         : null
+                    // 패키지 중량 미설정 + 이름에서 규격 감지되면 자동설정 가능
+                    const detectedG = !useGramInput ? detectPackageWeightG(r.itemName) : null
                     return (
                       <li
                         key={r.inventoryItemId}
@@ -857,8 +905,8 @@ export default function MenuPage() {
                               {ppg != null
                                 ? `1${baseLabel}당 ${formatWon(ppg)}`
                                 : `단가 ${formatWon(r.itemUnitPrice)} / ${r.itemUnit}`}
-                              {!r.itemPackageWeightG && r.itemUnitType !== 'count' && (
-                                <span className="ml-1 text-rose-500">⚠ 패키지 중량 미설정</span>
+                              {!useGramInput && (
+                                <span className="ml-1 text-rose-500">⚠ 중량 미설정</span>
                               )}
                             </p>
                           </div>
@@ -869,6 +917,15 @@ export default function MenuPage() {
                             ✕
                           </button>
                         </div>
+                        {detectedG != null && (
+                          <button
+                            type="button"
+                            onClick={() => autoSetPackageWeight(r.inventoryItemId, detectedG)}
+                            className="w-full mt-2 px-2.5 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-[11px] text-violet-700 hover:bg-violet-100"
+                          >
+                            🪄 이름에서 <b>{detectedG >= 1000 ? `${detectedG/1000}kg` : `${detectedG}g`}</b> 감지 — 자동 설정
+                          </button>
+                        )}
                         <div className="flex items-center gap-2 mt-2">
                           <input
                             type="number"
@@ -965,33 +1022,46 @@ export default function MenuPage() {
                         const ut = deriveUnitType(i.unit)
                         const ppg = pricePerG(i.unitPrice, i.packageWeightG)
                         const baseLabel = ut === 'volume' ? 'ml' : 'g'
-                        const needsSetup = ut !== 'count' && !i.packageWeightG
+                        const detectedG = !i.packageWeightG ? detectPackageWeightG(i.name) : null
                         return (
-                          <button
-                            key={i.id}
-                            onClick={() => addRecipeRow(i)}
-                            className="w-full text-left px-3 py-2 rounded-lg bg-white hover:bg-blue-100 text-xs flex items-center justify-between active:scale-95 transition-transform"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-800 truncate">{i.name}</p>
-                              {i.category && (
-                                <p className="text-[10px] text-gray-400">{i.category}</p>
-                              )}
-                            </div>
-                            <span className="text-[11px] ml-2 whitespace-nowrap">
-                              {ppg != null ? (
-                                <span className="font-bold text-emerald-600">
-                                  {formatWon(ppg)}/{baseLabel}
-                                </span>
-                              ) : needsSetup ? (
-                                <span className="text-rose-500">⚠ 중량 미설정</span>
-                              ) : (
-                                <span className="text-gray-400">
-                                  {i.unitPrice != null ? formatWon(i.unitPrice) : '단가 없음'}/{i.unit}
-                                </span>
-                              )}
-                            </span>
-                          </button>
+                          <div key={i.id} className="space-y-1">
+                            <button
+                              onClick={() => addRecipeRow(i)}
+                              className="w-full text-left px-3 py-2 rounded-lg bg-white hover:bg-blue-100 text-xs flex items-center justify-between active:scale-95 transition-transform"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-800 truncate">{i.name}</p>
+                                {i.category && (
+                                  <p className="text-[10px] text-gray-400">{i.category}</p>
+                                )}
+                              </div>
+                              <span className="text-[11px] ml-2 whitespace-nowrap">
+                                {ppg != null ? (
+                                  <span className="font-bold text-emerald-600">
+                                    {formatWon(ppg)}/{baseLabel}
+                                  </span>
+                                ) : !i.packageWeightG ? (
+                                  <span className="text-rose-500">⚠ 중량 미설정</span>
+                                ) : (
+                                  <span className="text-gray-400">
+                                    {i.unitPrice != null ? formatWon(i.unitPrice) : '단가 없음'}/{i.unit}
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                            {detectedG != null && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  autoSetPackageWeight(i.id, detectedG)
+                                }}
+                                className="w-full px-2.5 py-1 rounded-md bg-violet-50 border border-violet-200 text-[10px] text-violet-700 hover:bg-violet-100"
+                              >
+                                🪄 <b>{detectedG >= 1000 ? `${detectedG/1000}kg` : `${detectedG}g`}</b> 감지 — 클릭 한번에 설정
+                              </button>
+                            )}
+                          </div>
                         )
                       })
                     )}
