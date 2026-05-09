@@ -9,6 +9,7 @@ interface InventoryItem {
   currentStock: number
   safetyStock: number | null
   unitPrice: number | null
+  packageWeightG: number | null
   category: string | null
   supplier: { id: string; name: string } | null
 }
@@ -17,6 +18,28 @@ interface OrderRow {
   item: InventoryItem
   quantity: string
   checked: boolean
+}
+
+function isVolumeUnit(unit: string): boolean {
+  const u = unit.toLowerCase()
+  return u === 'l' || u === 'ml' || u === 'cc'
+}
+
+function basePerUnit(unit: string): 'g' | 'ml' {
+  return isVolumeUnit(unit) ? 'ml' : 'g'
+}
+
+function pricePerBase(item: InventoryItem): number | null {
+  if (item.unitPrice == null || !item.packageWeightG || item.packageWeightG <= 0) {
+    return null
+  }
+  return item.unitPrice / item.packageWeightG
+}
+
+function formatPerBaseWon(n: number): string {
+  if (n >= 100) return `${Math.round(n).toLocaleString()}원`
+  if (n >= 1) return `${n.toFixed(1)}원`
+  return `${n.toFixed(2)}원`
 }
 
 export default function EmployeeOrderPage() {
@@ -136,14 +159,26 @@ export default function EmployeeOrderPage() {
       row.item.safetyStock === null ||
       row.item.currentStock > row.item.safetyStock
   )
-  const selectedCount = orderRows.filter(
+  const selectedRows = orderRows.filter(
     (row) => row.checked && row.quantity !== '' && Number(row.quantity) > 0
-  ).length
+  )
+  const selectedCount = selectedRows.length
+  const totalEstimate = selectedRows.reduce((sum, row) => {
+    if (row.item.unitPrice == null) return sum
+    return sum + row.item.unitPrice * Number(row.quantity)
+  }, 0)
 
   function renderRow(row: OrderRow) {
     const isLow =
       row.item.safetyStock !== null &&
       row.item.currentStock <= row.item.safetyStock
+    const perBase = pricePerBase(row.item)
+    const baseUnit = basePerUnit(row.item.unit)
+    const qtyNum = Number(row.quantity)
+    const lineTotal =
+      row.item.unitPrice != null && qtyNum > 0
+        ? row.item.unitPrice * qtyNum
+        : null
     return (
       <div
         key={row.item.id}
@@ -171,6 +206,24 @@ export default function EmployeeOrderPage() {
               : ''}
             {row.item.supplier ? ` · ${row.item.supplier.name}` : ''}
           </p>
+          {row.item.unitPrice != null && (
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              <span className="font-medium text-gray-600">
+                {row.item.unitPrice.toLocaleString()}원/{row.item.unit}
+              </span>
+              {perBase != null && (
+                <span className="text-gray-400">
+                  {' · '}
+                  {formatPerBaseWon(perBase)}/{baseUnit}
+                </span>
+              )}
+              {lineTotal != null && (
+                <span className="ml-1.5 text-blue-600 font-semibold">
+                  → {Math.round(lineTotal).toLocaleString()}원
+                </span>
+              )}
+            </p>
+          )}
         </div>
         {/* 수량 입력 */}
         <div className="flex items-center gap-1 shrink-0">
@@ -276,6 +329,17 @@ export default function EmployeeOrderPage() {
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
             />
           </div>
+
+          {totalEstimate > 0 && (
+            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
+              <span className="text-xs text-blue-700">
+                💰 예상 총액 ({selectedCount}개 품목)
+              </span>
+              <span className="text-base font-bold text-blue-700">
+                {Math.round(totalEstimate).toLocaleString()}원
+              </span>
+            </div>
+          )}
 
           <button
             type="submit"
