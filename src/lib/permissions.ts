@@ -64,6 +64,16 @@ export function canManageInventory(role: string | null | undefined): boolean {
   return canScanReceipt(role)
 }
 
+/**
+ * 물건 입고 등록(OCR로 거래명세서/영수증 촬영 → 재고 입고) — 모든 직원 허용.
+ * 사원도 물건이 오면 직접 등록할 수 있게 한다. (재무 화면 접근과는 별개)
+ */
+export function canRegisterInbound(role: string | null | undefined): boolean {
+  // 현재는 모든 역할 허용. 추후 매장별 토글이 필요하면 여기서 분기.
+  normalizeRole(role)
+  return true
+}
+
 /** 직원 관리 (CRUD) — 사장 / 점장 */
 export function canManageEmployees(role: string | null | undefined): boolean {
   return canAccessOwnerArea(role)

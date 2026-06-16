@@ -6,6 +6,11 @@ import {
   refundOcrQuota,
   PLAN_LABEL,
 } from '@/lib/ocr-quota'
+import {
+  computeReceiptFingerprint,
+  isFingerprintReliable,
+  dedupeColumnAvailable,
+} from '@/lib/receipt-dedup'
 
 interface GeminiItem {
   name: string
@@ -168,6 +173,55 @@ export async function POST(req: NextRequest) {
       rawText: parsed.rawText || '',
     }
 
+    // 중복 감지용 지문 계산 (dedupeHash 컬럼이 있는 환경에서만)
+    const hasDedupeCol = await dedupeColumnAvailable()
+    const fpInput = {
+      supplierName: normalizedParsed.supplierName,
+      date: normalizedParsed.date,
+      total: normalizedParsed.total,
+      items: normalizedParsed.items,
+    }
+    const reliable = hasDedupeCol && isFingerprintReliable(fpInput)
+    const dedupeHash = reliable ? computeReceiptFingerprint(fpInput) : null
+
+    // 같은 매장에서 동일 지문의 영수증이 이미 있는지 (이미 처리/확정된 것)
+    let duplicate: {
+      receiptId: string
+      status: string
+      createdAt: Date
+      hasExpense: boolean
+      amount: number | null
+      expenseDate: Date | null
+    } | null = null
+
+    if (dedupeHash) {
+      const prior = await prisma.receiptImage.findFirst({
+        where: {
+          restaurantId,
+          dedupeHash,
+          status: { in: ['PROCESSED', 'CONFIRMED'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          expenses: {
+            select: { id: true, amount: true, expenseDate: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      })
+      if (prior) {
+        duplicate = {
+          receiptId: prior.id,
+          status: prior.status,
+          createdAt: prior.createdAt,
+          hasExpense: prior.expenses.length > 0,
+          amount: prior.expenses[0]?.amount ?? null,
+          expenseDate: prior.expenses[0]?.expenseDate ?? null,
+        }
+      }
+    }
+
     // ReceiptImage DB 저장
     const userId = session.user.id
 
@@ -179,6 +233,8 @@ export async function POST(req: NextRequest) {
         ocrRawText: normalizedParsed.rawText,
         ocrParsed: normalizedParsed as object,
         status: 'PROCESSED',
+        // 컬럼이 없는 환경에서는 필드 자체를 생략 (마이그레이션 전 호환)
+        ...(hasDedupeCol ? { dedupeHash } : {}),
       },
     })
 
@@ -186,6 +242,8 @@ export async function POST(req: NextRequest) {
       receiptId: receipt.id,
       parsed: normalizedParsed,
       rawText: normalizedParsed.rawText,
+      // 이미 등록된 동일 영수증이 있으면 경고 정보 동봉 (UI에서 중복 차단/확인)
+      duplicate,
     })
   } catch (error) {
     console.error('OCR route error:', error)

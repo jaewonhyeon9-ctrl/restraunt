@@ -421,11 +421,15 @@ model ReceiptImage {
   ocrRawText   String?
   ocrParsed    Json?
   status       ReceiptStatus @default(PENDING)
+  // 중복 감지용 지문(해시): 거래처+날짜+총액+품목수 기반. 같은 영수증/거래명세서 재등록 차단.
+  dedupeHash   String?
   createdAt    DateTime      @default(now())
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id])
   user       User       @relation(fields: [userId], references: [id])
   expenses   Expense[]
+
+  @@index([restaurantId, dedupeHash])
 }
 
 enum ReceiptStatus {

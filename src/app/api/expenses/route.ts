@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { ExpenseCategory, ReceiptType } from '@prisma/client'
+import {
+  computeReceiptFingerprint,
+  isFingerprintReliable,
+  dedupeColumnAvailable,
+} from '@/lib/receipt-dedup'
 
 const VAT_DEDUCTIBLE_TYPES: ReceiptType[] = ['TAX_INVOICE', 'CARD', 'CASH_RECEIPT']
 
@@ -89,6 +94,7 @@ export async function POST(req: NextRequest) {
       description,
       autoInventory,
       items,
+      force,
     } = body as {
       receiptId?: string
       supplierId?: string
@@ -99,6 +105,7 @@ export async function POST(req: NextRequest) {
       expenseDate: string
       description?: string
       autoInventory?: boolean
+      force?: boolean // 중복 경고에도 사용자가 강제 등록
       items?: Array<{
         name: string
         quantity: number
@@ -131,89 +138,143 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 영수증 상태 업데이트
-    if (receiptId) {
-      await prisma.receiptImage.update({
-        where: { id: receiptId },
-        data: { status: 'CONFIRMED' },
-      }).catch(() => {}) // 영수증 없어도 계속 진행
-    }
+    // --- 중복 감지: 이미 확정된 동일 영수증/거래명세서가 있으면 차단 ---
+    // 지문은 OCR 단계에서 영수증에 저장해 둔 값을 우선 사용(가장 정확), 없으면 입력값으로 계산.
+    // dedupeHash 컬럼이 없는(마이그레이션 전) 환경에서는 중복검사를 건너뛴다.
+    const hasDedupeCol = await dedupeColumnAvailable()
+    let dedupeHash: string | null = null
+    if (hasDedupeCol) {
+      if (receiptId) {
+        const r = await prisma.receiptImage.findUnique({
+          where: { id: receiptId },
+          select: { dedupeHash: true },
+        })
+        dedupeHash = r?.dedupeHash ?? null
+      }
+      if (!dedupeHash) {
+        const fpInput = { supplierName, date: expenseDate, total: amount, items }
+        if (isFingerprintReliable(fpInput)) {
+          dedupeHash = computeReceiptFingerprint(fpInput)
+        }
+      }
 
-    // 지출 생성
-    const expense = await prisma.expense.create({
-      data: {
-        restaurantId,
-        userId,
-        supplierId: resolvedSupplierId,
-        receiptId: receiptId || null,
-        category,
-        receiptType: resolvedReceiptType,
-        isVatDeductible,
-        amount,
-        expenseDate: new Date(expenseDate),
-        description: description || null,
-      },
-      include: {
-        supplier: { select: { id: true, name: true } },
-      },
-    })
-
-    // 재고 자동 입고 처리
-    if (autoInventory && items && items.length > 0) {
-      for (const item of items) {
-        if (!item.name || item.quantity <= 0) continue
-
-        // 재고 아이템 조회 또는 생성
-        let inventoryItem = await prisma.inventoryItem.findFirst({
+      if (dedupeHash && !force) {
+        const prior = await prisma.receiptImage.findFirst({
           where: {
             restaurantId,
-            name: item.name,
-            isActive: true,
+            dedupeHash,
+            status: 'CONFIRMED',
+            expenses: { some: {} },
+            ...(receiptId ? { id: { not: receiptId } } : {}),
           },
-        })
-
-        if (!inventoryItem) {
-          inventoryItem = await prisma.inventoryItem.create({
-            data: {
-              restaurantId,
-              supplierId: resolvedSupplierId,
-              name: item.name,
-              unit: item.unit || '개',
-              unitPrice: item.unitPrice || 0,
-              currentStock: 0,
+          include: {
+            expenses: {
+              select: { id: true, amount: true, expenseDate: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
             },
-          })
-        }
-
-        const beforeStock = inventoryItem.currentStock
-
-        // 재고 로그 생성
-        await prisma.inventoryLog.create({
-          data: {
-            itemId: inventoryItem.id,
-            restaurantId,
-            userId,
-            type: 'IN',
-            quantity: item.quantity,
-            beforeStock,
-            afterStock: beforeStock + item.quantity,
-            unitPrice: item.unitPrice || 0,
-            totalPrice: item.totalPrice || 0,
-            note: `영수증 자동 입고 (지출 ID: ${expense.id})`,
-            expenseId: expense.id,
           },
         })
+        if (prior) {
+          return NextResponse.json(
+            {
+              error: '이미 등록된 영수증/거래명세서입니다. 중복 등록을 막았습니다.',
+              code: 'DUPLICATE',
+              duplicate: {
+                receiptId: prior.id,
+                amount: prior.expenses[0]?.amount ?? null,
+                expenseDate: prior.expenses[0]?.expenseDate ?? null,
+              },
+            },
+            { status: 409 }
+          )
+        }
+      }
+    }
 
-        // 재고 수량 업데이트
-        await prisma.inventoryItem.update({
-          where: { id: inventoryItem.id },
+    // 지출 + 영수증 확정 + 재고 입고를 하나의 트랜잭션으로 (부분 실패 방지)
+    const expense = await prisma.$transaction(async (tx) => {
+      // 영수증 상태 확정 (없으면 updateMany가 0건 처리 — 에러 없이 진행)
+      if (receiptId) {
+        await tx.receiptImage.updateMany({
+          where: { id: receiptId },
           data: {
-            currentStock: { increment: item.quantity },
-            unitPrice: item.unitPrice || inventoryItem.unitPrice,
+            status: 'CONFIRMED',
+            ...(dedupeHash ? { dedupeHash } : {}),
           },
         })
       }
-    }
+
+      const created = await tx.expense.create({
+        data: {
+          restaurantId,
+          userId,
+          supplierId: resolvedSupplierId,
+          receiptId: receiptId || null,
+          category,
+          receiptType: resolvedReceiptType,
+          isVatDeductible,
+          amount,
+          expenseDate: new Date(expenseDate),
+          description: description || null,
+        },
+        include: {
+          supplier: { select: { id: true, name: true } },
+        },
+      })
+
+      // 재고 자동 입고 처리
+      if (autoInventory && items && items.length > 0) {
+        for (const item of items) {
+          if (!item.name || item.quantity <= 0) continue
+
+          let inventoryItem = await tx.inventoryItem.findFirst({
+            where: { restaurantId, name: item.name, isActive: true },
+          })
+
+          if (!inventoryItem) {
+            inventoryItem = await tx.inventoryItem.create({
+              data: {
+                restaurantId,
+                supplierId: resolvedSupplierId,
+                name: item.name,
+                unit: item.unit || '개',
+                unitPrice: item.unitPrice || 0,
+                currentStock: 0,
+              },
+            })
+          }
+
+          const beforeStock = inventoryItem.currentStock
+
+          await tx.inventoryLog.create({
+            data: {
+              itemId: inventoryItem.id,
+              restaurantId,
+              userId,
+              type: 'IN',
+              quantity: item.quantity,
+              beforeStock,
+              afterStock: beforeStock + item.quantity,
+              unitPrice: item.unitPrice || 0,
+              totalPrice: item.totalPrice || 0,
+              note: `영수증 자동 입고 (지출 ID: ${created.id})`,
+              expenseId: created.id,
+            },
+          })
+
+          await tx.inventoryItem.update({
+            where: { id: inventoryItem.id },
+            data: {
+              currentStock: { increment: item.quantity },
+              unitPrice: item.unitPrice || inventoryItem.unitPrice,
+            },
+          })
+        }
+      }
+
+      return created
+    })
 
     return NextResponse.json({ expense }, { status: 201 })
   } catch (error) {
