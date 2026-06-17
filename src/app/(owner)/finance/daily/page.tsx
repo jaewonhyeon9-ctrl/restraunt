@@ -125,6 +125,7 @@ export default function DailyFinancePage() {
 
   // 사진 OCR 입력
   const ocrFileInputRef = useRef<HTMLInputElement>(null)
+  const ocrGalleryInputRef = useRef<HTMLInputElement>(null)
   const [ocrProcessing, setOcrProcessing] = useState(false)
   const [ocrError, setOcrError] = useState<string | null>(null)
   const [ocrConfidence, setOcrConfidence] = useState<number | null>(null)
@@ -204,6 +205,11 @@ export default function DailyFinancePage() {
   const handleOcrPickFile = () => {
     setOcrError(null)
     ocrFileInputRef.current?.click()
+  }
+
+  const handleOcrPickGallery = () => {
+    setOcrError(null)
+    ocrGalleryInputRef.current?.click()
   }
 
   const handleOcrFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -599,6 +605,9 @@ export default function DailyFinancePage() {
 
             {/* OCR 촬영/업로드 */}
             <div className="rounded-xl border border-dashed border-orange-300 bg-orange-50/50 p-3 space-y-2">
+              <p className="text-[11px] text-gray-500 font-medium">
+                📷 POS·배달앱 화면을 촬영하거나 갤러리에서 올리면 자동 입력
+              </p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -606,13 +615,30 @@ export default function DailyFinancePage() {
                   disabled={ocrProcessing}
                   className="flex-1 bg-white border border-orange-400 text-orange-600 text-xs font-semibold py-2 rounded-lg disabled:opacity-60"
                 >
-                  {ocrProcessing ? '🧠 인식 중...' : '📷 POS 화면 사진으로 자동 입력'}
+                  {ocrProcessing ? '🧠 인식 중...' : '📷 촬영'}
                 </button>
+                <button
+                  type="button"
+                  onClick={handleOcrPickGallery}
+                  disabled={ocrProcessing}
+                  className="flex-1 bg-white border border-orange-400 text-orange-600 text-xs font-semibold py-2 rounded-lg disabled:opacity-60"
+                >
+                  {ocrProcessing ? '🧠 인식 중...' : '🖼️ 갤러리'}
+                </button>
+                {/* 카메라용: capture로 후면 카메라 바로 실행 */}
                 <input
                   ref={ocrFileInputRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  onChange={handleOcrFile}
+                  className="hidden"
+                />
+                {/* 갤러리용: capture 없음 → 사진 보관함에서 선택 */}
+                <input
+                  ref={ocrGalleryInputRef}
+                  type="file"
+                  accept="image/*"
                   onChange={handleOcrFile}
                   className="hidden"
                 />

@@ -5,6 +5,7 @@ const TAB_ITEMS = [
   { href: '/dashboard', label: '대시보드', icon: '📊' },
   { href: '/finance', label: '재무', icon: '💰' },
   { href: '/employees', label: '직원', icon: '👥' },
+  { href: '/payroll', label: '급여', icon: '💵' },
   { href: '/inventory', label: '재고', icon: '📦' },
   { href: '/suppliers', label: '거래처', icon: '🤝' },
   { href: '/restaurants', label: '매장', icon: '🏪' },

@@ -20,6 +20,12 @@ const MENU_ITEMS = [
     description: '월세, 공과금, 인건비 등 고정 지출',
   },
   {
+    href: '/payroll',
+    emoji: '💵',
+    title: '급여 관리',
+    description: '출퇴근 기반 급여 자동 계산·지출 등록',
+  },
+  {
     href: '/finance/tax',
     emoji: '🧾',
     title: '세무 자동 계산',
