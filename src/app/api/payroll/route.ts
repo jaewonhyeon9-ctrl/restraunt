@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { normalizeRole } from '@/lib/permissions'
+import { normalizeRole, canAccessOwnerArea } from '@/lib/permissions'
 
 export const runtime = 'nodejs'
 
 const EMPLOYEE_ROLES = ['MANAGER', 'DEPUTY', 'STAFF', 'EMPLOYEE'] as const
 
-// 급여 지출(Expense)의 식별 마커 — 중복 등록 방지에 사용.
-// 같은 직원·같은 달은 한 번만 등록되도록 description을 결정적으로 생성.
-function wageMarker(yearMonth: string, name: string) {
-  return `[급여] ${yearMonth} ${name}`
+// 급여 지출(Expense) 식별 마커 — 중복 등록 방지에 사용.
+// 직원 식별은 userId 끝 6자(동명이인·이름 변경에도 안정적), 이름은 가독용으로만.
+function userTag(userId: string) {
+  return `#${userId.slice(-6)}`
+}
+function wageMarker(yearMonth: string, name: string, userId: string) {
+  return `[급여] ${yearMonth} ${name} ${userTag(userId)}`
 }
 
 function monthRange(yearMonth: string) {
@@ -68,14 +71,14 @@ async function aggregate(restaurantId: string, yearMonth: string) {
     },
     select: { id: true, description: true },
   })
-  const byMarker = new Map(wageExpenses.map((e) => [e.description ?? '', e.id]))
-
   const rows: PayrollRow[] = employees.map((emp) => {
     const totalMinutes = emp.attendance.reduce((s, a) => s + (a.workMinutes ?? 0), 0)
     const totalWage = emp.attendance.reduce((s, a) => s + (a.dailyWage ?? 0), 0)
     const workDays = emp.attendance.filter((a) => a.clockOut != null).length
-    const marker = wageMarker(yearMonth, emp.name)
-    const expenseId = byMarker.get(marker) ?? null
+    // userId 태그로 매칭 (이름 변경/동명이인에도 안정적)
+    const tag = userTag(emp.id)
+    const found = wageExpenses.find((e) => (e.description ?? '').includes(tag))
+    const expenseId = found?.id ?? null
     return {
       userId: emp.id,
       name: emp.name,
@@ -103,6 +106,10 @@ export async function GET(req: NextRequest) {
     const restaurantId = (session.user as { restaurantId?: string }).restaurantId
     if (!restaurantId) {
       return NextResponse.json({ error: '식당 정보가 없습니다' }, { status: 400 })
+    }
+    // 급여는 사장/점장 전용
+    if (!canAccessOwnerArea((session.user as { role?: string }).role)) {
+      return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 })
     }
 
     const yearMonth = req.nextUrl.searchParams.get('month') || currentYearMonth()
@@ -132,6 +139,10 @@ export async function POST(req: NextRequest) {
     if (!restaurantId) {
       return NextResponse.json({ error: '식당 정보가 없습니다' }, { status: 400 })
     }
+    // 급여 지출 등록은 사장/점장 전용
+    if (!canAccessOwnerArea((session.user as { role?: string }).role)) {
+      return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 })
+    }
 
     const body = await req.json().catch(() => ({}))
     const yearMonth: string = body.month || currentYearMonth()
@@ -160,7 +171,7 @@ export async function POST(req: NextRequest) {
           isVatDeductible: false, // 급여는 매입세액 공제 대상 아님
           amount: r.totalWage,
           expenseDate: lastDay,
-          description: wageMarker(yearMonth, r.name),
+          description: wageMarker(yearMonth, r.name, r.userId),
         },
       })
       registered += 1
