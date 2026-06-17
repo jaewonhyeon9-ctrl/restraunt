@@ -35,6 +35,7 @@ export interface VatBreakdown {
   salesVat: number // 매출세액
   grossPurchases: number // 공제대상 매입 합계 (부가세 포함)
   purchaseVat: number // 매입세액
+  deemedPurchaseVat: number // 의제매입세액공제액 (8/108)
   cardSales: number // 카드+배달 매출 합계
   cardDeduction: number // 신용카드매출세액공제(1.3%)
   expectedVat: number // 최종 납부예상 부가세
@@ -66,7 +67,7 @@ export async function calculateVat(
   endDate: Date,
   opts?: { cardDeductionUsedThisYear?: number }
 ): Promise<VatBreakdown> {
-  const [sales, expenses] = await Promise.all([
+  const [sales, expenses, exemptIngredients] = await Promise.all([
     prisma.sale.findMany({
       where: {
         restaurantId,
@@ -80,6 +81,15 @@ export async function calculateVat(
         isVatDeductible: true,
       },
     }),
+    // 의제매입세액 대상: 부가세 미공제(면세 농산물 등) 식재료
+    prisma.expense.findMany({
+      where: {
+        restaurantId,
+        expenseDate: { gte: startDate, lt: endDate },
+        category: 'INGREDIENT',
+        isVatDeductible: false,
+      },
+    }),
   ])
 
   const grossSales = sales.reduce((s, x) => s + x.amount, 0)
@@ -90,6 +100,11 @@ export async function calculateVat(
   const supplyAmount = grossSales - salesVat
   const purchaseVat = extractVat(grossPurchases)
 
+  // 의제매입세액공제 (음식점업): 부가세 미공제 식재료(면세 농산물 등)에만 8/108 적용.
+  // 이미 매입세액으로 공제된 과세 식재료에는 적용하지 않음 (중복공제 방지).
+  const deemedVatDeductibleAmount = exemptIngredients.reduce((s, x) => s + x.amount, 0)
+  const deemedPurchaseVat = Math.round(deemedVatDeductibleAmount * (8 / 108))
+
   // 신용카드매출세액공제 (연 한도 체크)
   const used = opts?.cardDeductionUsedThisYear ?? 0
   const remainingLimit = Math.max(0, CARD_DEDUCTION_ANNUAL_LIMIT - used)
@@ -98,7 +113,7 @@ export async function calculateVat(
     remainingLimit
   )
 
-  const expectedVat = Math.max(0, salesVat - purchaseVat - cardDeduction)
+  const expectedVat = Math.max(0, salesVat - purchaseVat - deemedPurchaseVat - cardDeduction)
 
   return {
     grossSales,
@@ -106,6 +121,7 @@ export async function calculateVat(
     salesVat,
     grossPurchases,
     purchaseVat,
+    deemedPurchaseVat,
     cardSales,
     cardDeduction,
     expectedVat,

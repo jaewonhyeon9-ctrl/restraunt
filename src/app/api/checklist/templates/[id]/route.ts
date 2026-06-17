@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { ChecklistCategory } from '@prisma/client'
-import { normalizeTime } from '../route'
+import { normalizeTime } from '@/lib/time'
 
 const VALID_CATEGORY = new Set(['KITCHEN', 'HALL'])
 

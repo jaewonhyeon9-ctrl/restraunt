@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { ChecklistCategory } from '@prisma/client'
 import * as XLSX from 'xlsx'
-import { normalizeTime } from '../route'
+import { normalizeTime } from '@/lib/time'
 
 async function requireOwner() {
   const session = await auth()
